@@ -31,6 +31,18 @@ EAST = 2
 WEST = 3
 HOVER = 4
 
+def GenerateStateSpace(map):
+    print('Generate State Space')
+
+    stateSpace = np.empty((0,3),int)
+
+    for m in range(0,map.shape[0]):
+        for n in range(0,map.shape[1]):
+            if map[m,n] != TREE:
+                stateSpace = np.append(stateSpace, [[m, n, 0], [m, n, 1]], 0)
+            
+    return stateSpace
+
 
 def BaseStateIndex(stateSpace, map):
     

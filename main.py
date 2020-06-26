@@ -19,16 +19,12 @@ map = env.Generate_world_subgoals_simplified()
 
 # %% Generate State Space
 
-print('Generate State Space')
-
-stateSpace = np.empty((0,3),int)
-
-for m in range(0,map.shape[0]):
-    for n in range(0,map.shape[1]):
-        if map[m,n] != ss.TREE:
-            stateSpace = np.append(stateSpace, [[m, n, 0], [m, n, 1]], 0)
-            
+stateSpace=ss.GenerateStateSpace(map)            
 K = stateSpace.shape[0];
 TERMINAL_STATE_INDEX = ss.TerminalStateIndex(stateSpace,map)
 P = dp.ComputeTransitionProbabilityMatrix(stateSpace,map)
+G = dp.ComputeStageCosts(stateSpace,map)
+[J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
+#%% Plot Optimal Solution
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi)
