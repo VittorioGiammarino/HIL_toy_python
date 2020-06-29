@@ -46,7 +46,55 @@ def SampleTrajMDP(P,u,max_epoch,nTraj,initial_state,terminal_state):
         flag = np.append(flag,success)
         
     return traj, control, flag
+
+
+def StochasticSampleTrajMDP(P,u_policy,max_epoch,nTraj,initial_state,terminal_state):
+    
+    traj = [[None]*1 for _ in range(nTraj)]
+    control = [[None]*1 for _ in range(nTraj)]
+    flag = np.empty((0,0),int)
+    
+    for t in range(0,nTraj):
         
+        x = np.empty((0,0),int)
+        x = np.append(x, initial_state)
+        u_tot = np.empty((0,0))
+        
+        for k in range(0,max_epoch):
+            # draw action
+            prob_u = u_policy[x[k],:]
+            prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.001)
+            for i in range(1,prob_u_rescaled.shape[0]):
+                prob_u_rescaled[i]=prob_u_rescaled[i]+prob_u_rescaled[i-1]
+            draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.001)
+            u = np.amin(np.where(draw_u<prob_u_rescaled))
+            # given action, draw next state
+            x_k_possible=np.where(P[x[k],:,int(u)]!=0)
+            prob = P[x[k],x_k_possible[0][:],int(u)]
+            prob_rescaled = np.divide(prob,np.amin(prob))
+            
+            for i in range(1,prob_rescaled.shape[0]):
+                prob_rescaled[i]=prob_rescaled[i]+prob_rescaled[i-1]
+            draw=np.divide(np.random.rand(),np.amin(prob))
+            index_x_plus1=np.amin(np.where(draw<prob_rescaled))
+            x = np.append(x, x_k_possible[0][index_x_plus1])
+            u_tot = np.append(u_tot,u)
+            
+            if x[k+1]==terminal_state:
+                u_tot = np.append(u_tot,np.argmax(u_policy[terminal_state]))
+                break
+        
+        traj[t][:] = x
+        control[t][:]=u_tot
+        
+        if x[-1]==terminal_state:
+            success = 1
+        else:
+            success = 0
+                
+        flag = np.append(flag,success)
+        
+    return traj, control, flag
         
                 
             
