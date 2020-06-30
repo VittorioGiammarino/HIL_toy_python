@@ -14,6 +14,7 @@ import Environment as env
 import StateSpace as ss
 import DynamicProgramming as dp
 import Simulation as sim
+import BehavioralCloning as bc
 
 # %% map generation 
 map = env.Generate_world_subgoals_simplified()
@@ -37,64 +38,56 @@ base=ss.BaseStateIndex(stateSpace,map)
 # %% Simulation
 #env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:])
 
-# %% Process Data
-
-Xtr = np.empty((2,0),int)
-inputs = np.empty((3,0),int)
-
-for i in range(len(traj)):
-    Xtr = np.append(Xtr, [traj[i][:], control[i][:]],axis=1)
-    inputs = np.append(inputs, np.transpose(stateSpace[traj[i][:],:]), axis=1) 
-    
-labels = Xtr[1,:]
-TrainingSet = np.transpose(inputs) 
-    
-# %% NN design
-
+# %% NN Behavioral Cloning
 action_space=5
+labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
+model1 = bc.NN1(action_space)
+model2 = bc.NN2(action_space)
+model3 = bc.NN3(action_space)
 
-model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(3,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(action_space)
-    ])
-
-tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True,
-                          expand_nested=True)
-
-# model.compile(optimizer='adam',
-#               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-#               metrics=['accuracy'])
- 
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-
+# train the models
+model1.fit(TrainingSet, labels, epochs=10)
 encoded = tf.keras.utils.to_categorical(labels)
+model2.fit(TrainingSet, encoded, epochs=10)
+model3.fit(TrainingSet, encoded, epochs=10)
+predictionsNN1, deterministic_policyNN1 = bc.MakePredictions(model1, stateSpace)
+predictionsNN2, deterministic_policyNN2 = bc.MakePredictions(model2, stateSpace)
+predictionsNN3, deterministic_policyNN2 = bc.MakePredictions(model3, stateSpace)
+        
+#env.PlotOptimalSolution(map,stateSpace,deterministic_policyNN1)
 
-#model.fit(TrainingSet, labels, epochs=10)
-
-model.fit(TrainingSet, encoded, epochs=10)
-
-
-# %% predictions
-
-probability_model = tf.keras.Sequential([model, 
-                                         tf.keras.layers.Softmax()])
-
-deterministic_policy = np.empty(0)
-
-predictions = probability_model.predict(stateSpace[:,:])
- 
-for i in range(stateSpace.shape[0]):    
-    deterministic_policy = np.append(deterministic_policy, np.argmax(predictions[i,:]))
-    
-env.PlotOptimalSolution(map,stateSpace,deterministic_policy)
-
-# %%
-
-T=6000
+# %% Simulation of NN 
+T=1
 base=ss.BaseStateIndex(stateSpace,map)
-[trajNN,controlNN,flagNN]=sim.StochasticSampleTrajMDP(P, predictions, 1000, T, base, TERMINAL_STATE_INDEX)
+[trajNN1,controlNN1,flagNN1]=sim.StochasticSampleTrajMDP(P, predictionsNN1, 1000, T, base, TERMINAL_STATE_INDEX)
+#env.VideoSimulation(map,stateSpace,controlNN1[1][:],trajNN1[1][:],"sim_NN1.mp4")
+
+# %% Evaluate Performance
+
+ntraj = [10, 20, 50, 100, 200, 500, 1000]
+average_NN1, success_percentageNN1, average_expert = bc.EvaluationNN1(map, stateSpace, P, traj, control, ntraj)
+average_NN2, success_percentageNN2, average_expert = bc.EvaluationNN2(map, stateSpace, P, traj, control, ntraj)
+average_NN3, success_percentageNN3, average_expert = bc.EvaluationNN3(map, stateSpace, P, traj, control, ntraj)
+
+# %% plot of performance 
+plt.figure()
+plt.subplot(211)
+plt.plot(ntraj, average_NN1,'go--', label = 'Neural Network 1')
+plt.plot(ntraj, average_NN2,'rs--', label = 'Neural Network 2')
+plt.plot(ntraj, average_NN3,'cp--', label = 'Neural Network 3')
+plt.plot(ntraj, average_expert,'b', label = 'Expert')
+plt.ylabel('Average steps to goal')
+plt.subplot(212)
+plt.plot(ntraj, success_percentageNN1,'go--', label = 'Nerual Network 1')
+plt.plot(ntraj, success_percentageNN2,'rs--', label = 'Nerual Network 2')
+plt.plot(ntraj, success_percentageNN3,'cp--', label = 'Nerual Network 3')
+plt.plot(ntraj, np.ones((len(ntraj))),'b', label='Expert')
+plt.xlabel('Number of Trajectories')
+plt.ylabel('Percentage of success')
+plt.legend(loc='lower right')
+plt.savefig('evaluation.eps', format='eps')
+plt.show()
+
+
+
 

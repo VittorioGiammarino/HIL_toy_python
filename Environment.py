@@ -234,7 +234,7 @@ def PlotOptimalSolution(map,stateSpace,u):
         if p < u.shape[0]:
             p=p+2
 
-def VideoSimulation(map,stateSpace,u,states):
+def VideoSimulation(map,stateSpace,u,states,name_video):
     mapsize = map.shape
     #count trees
     ntrees=0;
@@ -321,7 +321,7 @@ def VideoSimulation(map,stateSpace,u,states):
         
     ani = animation.ArtistAnimation(fig, ims, interval=1200, blit=True,
                                 repeat_delay=2000)
-    ani.save("movie.mp4")
+    ani.save(name_video)
     
     plt.show()
         
