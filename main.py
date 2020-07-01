@@ -5,7 +5,6 @@ Created on Thu Jun 25 14:53:43 2020
 
 @author: Vittorio Giammarino 
 """
-
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
