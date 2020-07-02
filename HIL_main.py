@@ -64,32 +64,32 @@ beta = np.empty((option_space,termination_space,len(TrainingSet)))
 for n in range(N):
     print('iter', n, '/', N)
     
+    # Uncomment for sequential Running
+    # alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
+    # beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
+    
+    # MultiThreading Running
     with concurrent.futures.ThreadPoolExecutor() as executor:
         f1 = executor.submit(hil.Alpha, TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
         f2 = executor.submit(hil.Beta, TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)  
         alpha = f1.result()
         beta = f2.result()
         
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        f3 = executor.submit(hil.Gamma, TrainingSet, option_space, termination_space, alpha, beta)
+        f4 = executor.submit(hil.GammaTilde, TrainingSet, labels, beta, alpha, 
+                              NN_options, NN_actions, NN_termination, zeta, option_space, termination_space)  
+        gamma = f3.result()
+        gamma_tilde = f4.result()
+        
+    
+    # gamma = hil.Gamma(TrainingSet, option_space, termination_space, alpha, beta)
+    # gamma_tilde = hil.GammaTilde(TrainingSet, labels, beta, alpha, 
+    #                              NN_options, NN_actions, NN_termination, zeta, option_space, termination_space)
+    
+        
     print('fammoc')
-    #_thread.start_new_thread(hil.Alpha, (TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination,))
-    
-    # r1 = Process(target=hil.Alpha, args=(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination))
-    # r2 = Process(target=hil.Beta, args=(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination))
-    
-    # r1.start()
-    # r2.start()
-    
-    #r1.join()
-    # r2.join()
-    
-    # executor = ProcessPoolExecutor()
-    # f1 = executor.submit(hil.Alpha, [TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination])
-    # f2 = executor.submit(hil.Beta, [TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination])  
-    # alpha = f1.result()
-    # beta = f2.result()
-    
-    # alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
-    # beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
+
             
     
         

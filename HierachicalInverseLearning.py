@@ -226,6 +226,61 @@ def Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options,
                                         option_space, termination_space)
         
     return beta
+
+def Smoothing(option_space, termination_space, alpha, beta):
+    gamma = np.empty((option_space, termination_space))
+    for i1 in range(option_space):
+        ot=i1
+        for i2 in range(termination_space):
+            gamma = alpha[ot,i2]*beta[ot,i2]
+            
+    gamma = np.divide(gamma,np.sum(gamma))
+    
+    return gamma
+
+def DoubleSmoothing(beta, alpha, a, Pi_hi_parameterization, Pi_lo_parameterization, 
+                    Pi_b_parameterization, state, zeta, option_space, termination_space):
+    gamma_tilde = np.empty((option_space, termination_space))
+    for i1_past in range(option_space):
+        ot_past = i1_past
+        for i2 in range(termination_space):
+            if i2 == 1:
+                b=True
+            else:
+                b=False
+            for i1 in range(option_space):
+                ot = i1
+                gamma_tilde[ot_past,i2] = gamma_tilde[ot_past,i2] + beta[ot,i2]*Pi_combined(ot, ot_past, a, b, 
+                                                                                  Pi_hi_parameterization, Pi_lo_parameterization, 
+                                                                                  Pi_b_parameterization, state, zeta, option_space)
+            gamma_tilde[ot_past,i2] = gamma_tilde[ot_past,i2]*np.sum(alpha[ot_past,:])
+    gamma_tilde = np.divide(gamma_tilde,np.sum(gamma_tilde))
+    
+    return gamma_tilde
+
+def Gamma(TrainingSet, option_space, termination_space, alpha, beta):
+    gamma = np.empty((option_space,termination_space,len(TrainingSet)))
+    for t in range(len(TrainingSet)):
+        print('gamma iter', t+1, '/', len(TrainingSet))
+        gamma[:,:,t]=Smoothing(option_space, termination_space, alpha[:,:,t], beta[:,:,t])
+        
+    return gamma
+
+def GammaTilde(TrainingSet, labels, beta, alpha, Pi_hi_parameterization, Pi_lo_parameterization, 
+               Pi_b_parameterization, zeta, option_space, termination_space):
+    gamma_tilde = np.empty((option_space,termination_space,len(TrainingSet)))
+    for t in range(1,len(TrainingSet)):
+        print('gamma tilde iter', t, '/', len(TrainingSet)-1)
+        state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
+        action = labels[t]
+        gamma_tilde[:,:,t]=DoubleSmoothing(beta[:,:,t], alpha[:,:,t-1], action, 
+                                           Pi_hi_parameterization, Pi_lo_parameterization, 
+                                           Pi_b_parameterization, state, zeta, option_space, termination_space)
+        
+    return gamma_tilde
+    
+        
+    
                     
                     
 
