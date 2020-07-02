@@ -169,5 +169,66 @@ def ForwardFirstRecursion(mu, a, Pi_hi_parameterization, Pi_lo_parameterization,
     alpha = np.divide(alpha, np.sum(alpha))
             
     return alpha
+
+def BackwardRecursion(beta_next, a, Pi_hi_parameterization, Pi_lo_parameterization,
+                      Pi_b_parameterization, state, zeta, option_space, termination_space):
+# =============================================================================
+#     beta is the backward message: beta.shape()= [option_space, termination_space]
+# =============================================================================
+    beta = np.empty((option_space, termination_space))
+    for i1 in range(option_space):
+        ot = i1
+        for i2 in range(termination_space):
+            for i1_next in range(option_space):
+                ot_next = i1_next
+                for i2_next in range(termination_space):
+                    if i2 == 1:
+                        b_next=True
+                    else:
+                        b_next=False
+                    beta[i1,i2] = beta[i1,i2] + beta_next[ot_next,i2_next]*Pi_combined(ot_next, ot, a, b_next, 
+                                                                                       Pi_hi_parameterization, Pi_lo_parameterization, 
+                                                                                       Pi_b_parameterization, state, zeta, option_space)
+    beta = np.divide(beta,np.sum(beta))
+    
+    return beta
+
+def Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination):
+    alpha = np.empty((option_space,termination_space,len(TrainingSet)))
+    for t in range(len(TrainingSet)):
+        print('alpha iter', t+1, '/', len(TrainingSet))
+        if t ==0:
+            state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
+            action = labels[t]
+            alpha[:,:,t] = ForwardFirstRecursion(mu, action, NN_options, 
+                                                 NN_actions, NN_termination, 
+                                                 state, zeta, option_space, termination_space)
+        else:
+            state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
+            action = labels[t]
+            alpha[:,:,t] = ForwardRecursion(alpha[:,:,t-1], action, NN_options, 
+                                            NN_actions, NN_termination, 
+                                            state, zeta, option_space, termination_space)
+            
+    return alpha
+
+def Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination):
+    beta = np.empty((option_space,termination_space,len(TrainingSet)))
+    beta[:,:,len(TrainingSet)-1] = np.divide(np.ones((option_space,termination_space)),2*option_space)
+    
+    for t_raw in range(len(TrainingSet)-1):
+        t = len(TrainingSet) - (t_raw+1)
+        print('beta iter', t_raw+1, '/', len(TrainingSet)-1)
+        state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
+        action = labels[t]
+        beta[:,:,t-1] = BackwardRecursion(beta[:,:,t], action, NN_options, 
+                                        NN_actions, NN_termination, state, zeta, 
+                                        option_space, termination_space)
+        
+    return beta
+                    
+                    
+
+    
     
     

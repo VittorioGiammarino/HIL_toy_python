@@ -52,29 +52,22 @@ NN_termination = hil.NN_termination(termination_space)
 # %% Baum-Welch for provable HIL iteration
 
 ntraj = 10
-N = 20
+N = 1
 alpha = np.empty((option_space,termination_space,len(TrainingSet)))
 zeta = 0.1
 mu = np.ones(option_space)*np.divide(1,option_space)
 
+beta = np.empty((option_space,termination_space,len(TrainingSet)))
+
 for n in range(N):
     print('iter', n, '/', N)
-    for t in range(len(TrainingSet)):
-        print('iter', t, '/', len(TrainingSet))
-        if t ==0:
-            state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
-            action = labels[t]
-            alpha[:,:,t] = hil.ForwardFirstRecursion(mu, action, NN_options, 
-                                                     NN_actions, NN_termination, 
-                                                     state, zeta, option_space, termination_space)
-        else:
-            state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
-            action = labels[t]
-            alpha[:,:,t] = hil.ForwardRecursion(alpha[:,:,t-1], action, NN_options, 
-                                                     NN_actions, NN_termination, 
-                                                     state, zeta, option_space, termination_space)
+    alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
+    beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
             
-            
+    
+        
+
+          
 
     
     
