@@ -209,7 +209,7 @@ def Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_opt
             alpha[:,:,t] = ForwardRecursion(alpha[:,:,t-1], action, NN_options, 
                                             NN_actions, NN_termination, 
                                             state, zeta, option_space, termination_space)
-            
+           
     return alpha
 
 def Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination):

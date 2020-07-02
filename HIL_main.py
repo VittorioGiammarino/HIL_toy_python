@@ -16,6 +16,8 @@ import DynamicProgramming as dp
 import Simulation as sim
 import BehavioralCloning as bc
 import HierachicalInverseLearning as hil
+from multiprocessing import Pool, Process
+import concurrent.futures
 
 # %% map generation 
 map = env.Generate_world_subgoals_simplified()
@@ -61,8 +63,33 @@ beta = np.empty((option_space,termination_space,len(TrainingSet)))
 
 for n in range(N):
     print('iter', n, '/', N)
-    alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
-    beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
+    
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        f1 = executor.submit(hil.Alpha, TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
+        f2 = executor.submit(hil.Beta, TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)  
+        alpha = f1.result()
+        beta = f2.result()
+        
+    print('fammoc')
+    #_thread.start_new_thread(hil.Alpha, (TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination,))
+    
+    # r1 = Process(target=hil.Alpha, args=(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination))
+    # r2 = Process(target=hil.Beta, args=(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination))
+    
+    # r1.start()
+    # r2.start()
+    
+    #r1.join()
+    # r2.join()
+    
+    # executor = ProcessPoolExecutor()
+    # f1 = executor.submit(hil.Alpha, [TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination])
+    # f2 = executor.submit(hil.Beta, [TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination])  
+    # alpha = f1.result()
+    # beta = f2.result()
+    
+    # alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
+    # beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
             
     
         
