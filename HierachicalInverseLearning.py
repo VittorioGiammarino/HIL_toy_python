@@ -16,68 +16,48 @@ import Simulation as sim
 def NN_options(option_space):
     model = keras.Sequential([
     keras.layers.Dense(300, activation='relu', input_shape=(3,)),
-    keras.layers.Dense(option_space)
+    keras.layers.Dense(option_space),
+    keras.layers.Softmax()
     ])
 
     tf.keras.utils.plot_model(model, to_file='model_NN_options.png', 
                               show_shapes=True, 
                               show_layer_names=True,
                               expand_nested=True)
-
-    model.compile(optimizer='adam',
-                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-                  metrics=['accuracy'])
     
     return model
 
 def NN_actions(action_space):
     model = keras.Sequential([
     keras.layers.Dense(300, activation='relu', input_shape=(4,)),
-    keras.layers.Dense(action_space)
+    keras.layers.Dense(action_space),
+    keras.layers.Softmax()
     ])
 
     tf.keras.utils.plot_model(model, to_file='model_NN_actions.png', 
                               show_shapes=True, 
                               show_layer_names=True,
                               expand_nested=True)
-
-    model.compile(optimizer='adam',
-                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-                  metrics=['accuracy'])
     
     return model
 
 def NN_termination(termination_space):
     model = keras.Sequential([
     keras.layers.Dense(300, activation='relu', input_shape=(4,)),
-    keras.layers.Dense(termination_space)
+    keras.layers.Dense(termination_space),
+    keras.layers.Softmax()
     ])
 
     tf.keras.utils.plot_model(model, to_file='model_NN_termination.png', 
                               show_shapes=True, 
                               show_layer_names=True,
                               expand_nested=True)
-
-    model.compile(optimizer='adam',
-                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                  metrics=['accuracy'])
     
     return model
 
-def MakePredictions(model, inputs):
-    
-    probability_model = tf.keras.Sequential([model, 
-                                         tf.keras.layers.Softmax()])
-
-    predictions = probability_model.predict(inputs)
-    
-    return predictions
-
 def Pi_hi(ot, Pi_hi_parameterization, state):
-    tf.autograph.experimental.do_not_convert(
-    func=MakePredictions)
 
-    Pi_hi = MakePredictions(Pi_hi_parameterization, state)
+    Pi_hi = Pi_hi_parameterization(state)
     o_prob = Pi_hi[0,ot]
     
     return o_prob
@@ -93,13 +73,13 @@ def Pi_hi_bar(b, ot, ot_past, Pi_hi_parameterization, state, zeta, option_space)
     return o_prob_tilde
 
 def Pi_lo(a, Pi_lo_parameterization, state_and_option):
-    Pi_lo = MakePredictions(Pi_lo_parameterization, state_and_option)
+    Pi_lo = Pi_lo_parameterization(state_and_option)
     a_prob = Pi_lo[0,int(a)]
     
     return a_prob
 
 def Pi_b(b, Pi_b_parameterization, state_and_option):
-    Pi_b = MakePredictions(Pi_b_parameterization, state_and_option)
+    Pi_b = Pi_b_parameterization(state_and_option)
     if b == True:
         b_prob = Pi_b[0,1]
     else:
