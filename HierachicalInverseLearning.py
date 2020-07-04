@@ -5,9 +5,9 @@ Created on Wed Jul  1 11:25:42 2020
 
 @author: vittorio
 """
-
 import tensorflow as tf
 from tensorflow import keras
+import tensorflow.keras.backend as kb
 import numpy as np
 import StateSpace as ss
 import Simulation as sim
@@ -15,9 +15,7 @@ import Simulation as sim
 
 def NN_options(option_space):
     model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(3,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(3,)),
     keras.layers.Dense(option_space)
     ])
 
@@ -27,16 +25,14 @@ def NN_options(option_space):
                               expand_nested=True)
 
     model.compile(optimizer='adam',
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
                   metrics=['accuracy'])
     
     return model
 
 def NN_actions(action_space):
     model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(4,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(4,)),
     keras.layers.Dense(action_space)
     ])
 
@@ -46,16 +42,14 @@ def NN_actions(action_space):
                               expand_nested=True)
 
     model.compile(optimizer='adam',
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
                   metrics=['accuracy'])
     
     return model
 
 def NN_termination(termination_space):
     model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(4,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(4,)),
     keras.layers.Dense(termination_space)
     ])
 
@@ -232,8 +226,7 @@ def Smoothing(option_space, termination_space, alpha, beta):
     for i1 in range(option_space):
         ot=i1
         for i2 in range(termination_space):
-            gamma = alpha[ot,i2]*beta[ot,i2]
-            
+            gamma[ot,i2] = alpha[ot,i2]*beta[ot,i2]     
     gamma = np.divide(gamma,np.sum(gamma))
     
     return gamma
@@ -279,10 +272,35 @@ def GammaTilde(TrainingSet, labels, beta, alpha, Pi_hi_parameterization, Pi_lo_p
         
     return gamma_tilde
     
-        
+def Pi_b_evaluation(option_space, termination_space, NN_termination, state):
+    pi_b_evaluation = np.empty((option_space, termination_space))
+    for i1 in range(option_space):
+        ot = i1
+        for i2 in range(termination_space):
+            # if i2 == 1:
+            #     b=True
+            # else:
+            #     b=False
+            Pi_b = NN_termination(np.append(state, [[ot]],axis=1), training=True)
+            pi_b_evaluation[ot,i2] = Pi_b[0,i2]   
+            
+    return pi_b_evaluation
     
+def Pi_b_Data_LossFunction(option_space, termination_space, TrainingSet, NN_termination):
+    pi_b_data_evaluation = np.empty((option_space,termination_space,len(TrainingSet)))
+    for t in range(TrainingSet.shape[0]):
+        print('Pi_b Evaluation iter', t+1, '/', len(TrainingSet))
+        state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
+        pi_b_data_evaluation[:,:,t] = Pi_b_evaluation(option_space, termination_space, NN_termination, state)
+        
+    return pi_b_data_evaluation
+        
+
+def Pi_b_LossFunction(gamma_tilde, pi_b):
+    Pi_b_loss = kb.sum(gamma_tilde*kb.log(pi_b))/(gamma_tilde.shape[2])
+    return -Pi_b_loss
                     
-                    
+
 
     
     

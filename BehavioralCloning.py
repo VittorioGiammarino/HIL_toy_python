@@ -27,9 +27,7 @@ def ProcessData(traj,control,stateSpace):
 
 def NN1(action_space):
     model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(3,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(3,)),
     keras.layers.Dense(action_space)
     ])
 
@@ -46,9 +44,7 @@ def NN1(action_space):
     
 def NN2(action_space):
     model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(3,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(3,)),
     keras.layers.Dense(action_space)
     ])
 
@@ -65,9 +61,7 @@ def NN2(action_space):
 
 def NN3(action_space):
     model = keras.Sequential([
-    keras.layers.Dense(10, input_shape=(3,)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(3,)),
     keras.layers.Dense(action_space)
     ])
 

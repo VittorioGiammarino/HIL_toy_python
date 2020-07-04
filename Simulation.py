@@ -63,10 +63,10 @@ def StochasticSampleTrajMDP(P,u_policy,max_epoch,nTraj,initial_state,terminal_st
         for k in range(0,max_epoch):
             # draw action
             prob_u = u_policy[x[k],:]
-            prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.001)
+            prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
             for i in range(1,prob_u_rescaled.shape[0]):
                 prob_u_rescaled[i]=prob_u_rescaled[i]+prob_u_rescaled[i-1]
-            draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.001)
+            draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
             u = np.amin(np.where(draw_u<prob_u_rescaled))
             # given action, draw next state
             x_k_possible=np.where(P[x[k],:,int(u)]!=0)
