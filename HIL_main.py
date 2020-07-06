@@ -108,9 +108,21 @@ base=ss.BaseStateIndex(stateSpace,map)
 [trajHIL,controlHIL,OptionsHIL, 
  TerminationHIL, flagHIL]=sim.HierarchicalStochasticSampleTrajMDP(P, stateSpace, NN_options, 
                                                                   NN_actions, NN_termination, mu, 1000, 
-                                                                  T, base, TERMINAL_STATE_INDEX, zeta, option_space)
+                                                                  T, base, TERMINAL_STATE_INDEX, zeta, option_space)                                                                 
 # %%
-env.VideoSimulation(map,stateSpace,controlHIL[0][:],trajHIL[0][:],"sim_HIL.mp4")
+env.HILVideoSimulation(map,stateSpace,controlHIL[0][:],trajHIL[0][:],OptionsHIL[0][:],"sim_HIL.mp4")
+
+# %%
+
+Pi_HI = NN_options(stateSpace).numpy()    
+Pi_Lo_o1 = NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy()
+Pi_Lo_o2 = NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy()
+Pi_Lo_o3 = NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy()
+    
+    
+
+    
+
           
 
     

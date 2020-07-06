@@ -6,7 +6,6 @@ Created on Sun Jun 28 16:10:39 2020
 @author: vittorio
 """
 import numpy as np
-import HierachicalInverseLearning as hil
 
 def SampleTrajMDP(P,u,max_epoch,nTraj,initial_state,terminal_state):
     

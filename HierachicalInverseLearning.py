@@ -394,7 +394,15 @@ def OptimizeNNoptions(epochs, TrainingSet, NN_options, gamma_reshaped_options, T
         print('options loss:', float(loss_options))
         
     return loss_options
-    
+
+def TrainingSetPiLo(TrainingSet,o):
+    # Processing termination
+    T = len(TrainingSet)
+    TrainingSet_PiLo = np.empty((T,4))
+    for i in range(T):
+        TrainingSet_PiLo[i,:] = np.append(TrainingSet[i,:], [[o]])
+        
+    return TrainingSet_PiLo    
 
     
 
