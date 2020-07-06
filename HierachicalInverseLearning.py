@@ -252,34 +252,156 @@ def GammaTilde(TrainingSet, labels, beta, alpha, Pi_hi_parameterization, Pi_lo_p
         
     return gamma_tilde
     
-def Pi_b_evaluation(option_space, termination_space, NN_termination, state):
-    pi_b_evaluation = np.empty((option_space, termination_space))
-    for i1 in range(option_space):
-        ot = i1
-        for i2 in range(termination_space):
-            # if i2 == 1:
-            #     b=True
-            # else:
-            #     b=False
-            Pi_b = NN_termination(np.append(state, [[ot]],axis=1), training=True)
-            pi_b_evaluation[ot,i2] = Pi_b[0,i2]   
-            
-    return pi_b_evaluation
-    
-def Pi_b_Data_LossFunction(option_space, termination_space, TrainingSet, NN_termination):
-    pi_b_data_evaluation = np.empty((option_space,termination_space,len(TrainingSet)))
-    for t in range(TrainingSet.shape[0]):
-        print('Pi_b Evaluation iter', t+1, '/', len(TrainingSet))
-        state = TrainingSet[t,:].reshape(1,len(TrainingSet[t,:]))
-        pi_b_data_evaluation[:,:,t] = Pi_b_evaluation(option_space, termination_space, NN_termination, state)
+def TrainingSetTermination(TrainingSet,option_space):
+    # Processing termination
+    T = len(TrainingSet)
+    TrainingSet_reshaped_termination = np.empty((int(option_space*(T-1)),4))
+    j=1
+    for i in range(0,option_space*(T-1),option_space):
+        for k in range(option_space):
+            TrainingSet_reshaped_termination[i+k,:] = np.append(TrainingSet[j,:], [[k]])
+        j+=1
         
-    return pi_b_data_evaluation
+    return TrainingSet_reshaped_termination
         
+def GammaTildeReshape(gamma_tilde, option_space):
+    T = gamma_tilde.shape[2]
+    gamma_tilde_reshaped = np.empty((int(option_space*(T-1)),2),dtype='float32')
+    j=1
+    for i in range(0,option_space*(T-1),option_space):
+        gamma_tilde_reshaped[i:i+option_space,:] = gamma_tilde[:,:,j]
+        j+=1
+        
+    return gamma_tilde_reshaped
 
-def Pi_b_LossFunction(gamma_tilde, pi_b):
-    Pi_b_loss = kb.sum(gamma_tilde*kb.log(pi_b))/(gamma_tilde.shape[2])
-    return -Pi_b_loss
-                    
+def OptimizeNNtermination(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, T, optimizer):
+    
+    for epoch in range(epochs):
+        print("\nStart of epoch %d" % (epoch,))
+
+        # # Iterate over the batches of the dataset.
+        # for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+
+        # Open a GradientTape to record the operations run
+        # during the forward pass, which enables autodifferentiation.
+        with tf.GradientTape() as tape:
+            tape.watch(NN_termination.trainable_weights)
+            pi_b = NN_termination(TrainingSetTermination,training=True)
+            loss_termination = -kb.sum(gamma_tilde_reshaped*kb.log(pi_b))/(T)
+
+        # Use the gradient tape to automatically retrieve
+        # the gradients of the trainable variables with respect to the loss.
+        grads = tape.gradient(loss_termination, NN_termination.trainable_weights)
+
+        # Run one step of gradient descent by updating
+        # the value of the variables to minimize the loss.
+        optimizer.apply_gradients(zip(grads, NN_termination.trainable_weights))
+        print('termination loss:', float(loss_termination))
+        
+    return loss_termination
+    
+        
+def TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels):
+    TrainingSet_reshaped_actions = np.empty((int(option_space*(T)),4))
+    labels_reshaped = np.empty((int(option_space*(T)),1))
+    j=0
+    for i in range(0,option_space*(T),option_space):
+        for k in range(option_space):
+            TrainingSet_reshaped_actions[i+k,:] = np.append(TrainingSet[j,:], [[k]])
+            labels_reshaped[i+k,:] = labels[j]
+        j+=1
+        
+    return TrainingSet_reshaped_actions, labels_reshaped
+
+def GammaReshapeActions(T, option_space, action_space, gamma, labels_reshaped):
+    gamma_reshaped = np.empty((int(3*(T)),2),dtype='float32')
+    j=0
+    for i in range(0,3*(T),3):
+        gamma_reshaped[i:i+3,:] = gamma[:,:,j]
+        j+=1
+    
+    gamma_actions_false = np.empty((int(option_space*T),action_space))
+    for i in range(option_space*T):
+        for j in range(action_space):
+            if int(labels_reshaped[i])==j:
+                gamma_actions_false[i,j]=gamma_reshaped[i,0]
+            else:
+                gamma_actions_false[i,j] = 0
+            
+    gamma_actions_true = np.empty((int(option_space*T),action_space))
+    for i in range(option_space*T):
+        for j in range(action_space):
+            if int(labels_reshaped[i])==j:
+                gamma_actions_true[i,j]=gamma_reshaped[i,1]
+            else:
+                gamma_actions_true[i,j] = 0   
+                
+    return gamma_actions_false, gamma_actions_true
+
+def OptimizeNNactions(epochs, TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true, T, optimizer):
+    for epoch in range(epochs):
+        print("\nStart of epoch %d" % (epoch,))
+
+        # # Iterate over the batches of the dataset.
+        # for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+
+        # Open a GradientTape to record the operations run
+        # during the forward pass, which enables autodifferentiation.
+        with tf.GradientTape() as tape:
+            tape.watch(NN_actions.trainable_weights)
+            pi_lo = NN_actions(TrainingSetActions,training=True)
+            loss_action = -(kb.sum(gamma_actions_true*kb.log(pi_lo))+kb.sum(gamma_actions_false*kb.log(pi_lo)))/(T)
+
+        # Use the gradient tape to automatically retrieve
+        # the gradients of the trainable variables with respect to the loss.
+        grads = tape.gradient(loss_action, NN_actions.trainable_weights)
+
+    # Run one step of gradient descent by updating
+    # the value of the variables to minimize the loss.
+        optimizer.apply_gradients(zip(grads, NN_actions.trainable_weights))
+        print('action loss:', float(loss_action))
+        
+    return loss_action
+        
+def GammaReshapeOptions(T, option_space, gamma):
+    gamma_reshaped_options = np.empty((T,option_space),dtype='float32')
+    for i in range(T):
+        gamma_reshaped_options[i,:] = gamma[:,1,i]
+        
+    return gamma_reshaped_options
+
+def OptimizeNNoptions(epochs, TrainingSet, NN_options, gamma_reshaped_options, T, optimizer):
+    for epoch in range(epochs):
+        print("\nStart of epoch %d" % (epoch,))
+
+        # # Iterate over the batches of the dataset.
+        # for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+
+        # Open a GradientTape to record the operations run
+        # during the forward pass, which enables autodifferentiation.
+        with tf.GradientTape() as tape:
+            tape.watch(NN_options.trainable_weights)
+            pi_hi = NN_options(TrainingSet,training=True)
+            loss_options = -kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
+
+        # Use the gradient tape to automatically retrieve
+        # the gradients of the trainable variables with respect to the loss.
+        grads = tape.gradient(loss_options, NN_options.trainable_weights)
+        
+        # Run one step of gradient descent by updating
+        # the value of the variables to minimize the loss.
+        optimizer.apply_gradients(zip(grads, NN_options.trainable_weights))
+        print('options loss:', float(loss_options))
+        
+    return loss_options
+    
+
+    
+
+    
+        
+        
+    
 
 
     
