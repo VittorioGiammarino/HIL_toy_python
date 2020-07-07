@@ -16,7 +16,7 @@ import StateSpace as ss
 import DynamicProgramming as dp
 import Simulation as sim
 import BehavioralCloning as bc
-import HierachicalInverseLearning as hil
+import HierachicalImitationLearning as hil
 import concurrent.futures
 
 # %% map generation 
