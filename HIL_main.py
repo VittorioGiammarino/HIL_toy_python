@@ -60,6 +60,7 @@ mu = np.ones(option_space)*np.divide(1,option_space)
 T = TrainingSet.shape[0]
 TrainingSetTermination = hil.TrainingSetTermination(TrainingSet, option_space)
 TrainingSetActions, labels_reshaped = hil.TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels)
+lambdas = tf.Variable(initial_value=tf.random.normal((option_space,)), trainable=True)
 
 for n in range(N):
     print('iter', n, '/', N)
@@ -89,20 +90,22 @@ for n in range(N):
         
     print('Expectation done')
     print('Starting maximization step')
-    optimizer = keras.optimizers.Adam(learning_rate=1e-4)
+    optimizer = keras.optimizers.Adamax(learning_rate=1e-4)
     epochs = 100 #number of iterations for the maximization step
         
     gamma_tilde_reshaped = hil.GammaTildeReshape(gamma_tilde, option_space)
     gamma_actions_false, gamma_actions_true = hil.GammaReshapeActions(T, option_space, action_space, gamma, labels_reshaped)
     gamma_reshaped_options = hil.GammaReshapeOptions(T, option_space, gamma)
-    loss_termination = hil.OptimizeNNtermination(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, T, optimizer)
-    loss_action = hil.OptimizeNNactions(epochs, TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true, T, optimizer)
-    loss_options = hil.OptimizeNNoptions(epochs, TrainingSet, NN_options, gamma_reshaped_options, T, optimizer)
+    # loss_termination = hil.OptimizeNNtermination(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, T, optimizer)
+    # loss_action = hil.OptimizeNNactions(epochs, TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true, T, optimizer)
+    # loss_options = hil.OptimizeNNoptions(epochs, TrainingSet, NN_options, gamma_reshaped_options, T, optimizer)
+    loss = hil.OptimizeLossAndRegularizer(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
+                               TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
+                               TrainingSet, NN_options, gamma_reshaped_options, lambdas, T, optimizer, option_space)
 
-    print('Maximization done, Total Loss:',float(loss_options+loss_action+loss_termination))
+    print('Maximization done, Total Loss:',float(loss))#float(loss_options+loss_action+loss_termination))
 
 # %% Evaluation 
-
 T=1
 base=ss.BaseStateIndex(stateSpace,map)
 [trajHIL,controlHIL,OptionsHIL, 
@@ -113,19 +116,37 @@ base=ss.BaseStateIndex(stateSpace,map)
 env.HILVideoSimulation(map,stateSpace,controlHIL[0][:],trajHIL[0][:],OptionsHIL[0][:],"sim_HIL.mp4")
 
 # %%
-
 Pi_HI = NN_options(stateSpace).numpy()    
-Pi_Lo_o1 = NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy()
-Pi_Lo_o2 = NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy()
-Pi_Lo_o3 = NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy()
-    
-    
+Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
+Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
+Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
 
-    
 
-          
+# %%
+# lambdas = tf.Variable(initial_value=tf.random.normal((option_space,)), trainable=True)
 
-    
+
+# ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+# for i in range(option_space):
+#     ta.write(i,kb.sum(-kb.sum(NN_actions(hil.TrainingSetPiLo(stateSpace,i))*kb.log(
+#         NN_actions(hil.TrainingSetPiLo(stateSpace,i))),1)/T,0))
+# responsibilities = ta.stack()
+# values = kb.sum(lambdas*responsibilities)
+
+# # albi = np.sum(np.stack((-np.sum(Pi_Lo_o1*np.log(Pi_Lo_o1),1), -np.sum(Pi_Lo_o2*np.log(Pi_Lo_o2),1), -np.sum(Pi_Lo_o3*np.log(Pi_Lo_o3),1)),1),0)
+
+# # Reg = np.array(([10, 100, 1000]))
+
+# # final = np.multiply(albi,Reg)
+
+
+# indices = tf.range(option_space, dtype='int32').numpy()    
+# lambdas = tf.random.normal((1,option_space))
+
+# values = np.empty(3,)
+# for i in range(option_space):
+#     values[i] = tf.concat(values[i], NN_actions(hil.TrainingSetPiLo(stateSpace,i)))
+
     
     
     

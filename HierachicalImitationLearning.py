@@ -404,6 +404,50 @@ def TrainingSetPiLo(TrainingSet,o):
         
     return TrainingSet_PiLo    
 
+def RegularizedLoss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions_true, gamma_actions_false, 
+                    pi_b, pi_hi, pi_lo, responsibilities, lambdas, T, option_space):
+    
+ 
+    values = -kb.sum(lambdas*responsibilities)
+    loss_termination = -kb.sum(gamma_tilde_reshaped*kb.log(pi_b))/(T)
+    loss_options = -kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
+    loss_action = -(kb.sum(gamma_actions_true*kb.log(pi_lo))+kb.sum(gamma_actions_false*kb.log(pi_lo)))/(T)
+    loss = loss_termination+loss_options+loss_action
+    
+    return loss
+    
+
+def OptimizeLossAndRegularizer(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
+                               TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
+                               TrainingSet, NN_options, gamma_reshaped_options, lambdas, T, optimizer, option_space):
+    for epoch in range(epochs):
+        print("\nStart of epoch %d" % (epoch,))
+        
+        ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+        
+        with tf.GradientTape() as tape:
+            weights = [NN_termination.trainable_weights, NN_actions.trainable_weights, NN_options.trainable_weights, lambdas]
+            tape.watch(weights)
+            for i in range(option_space):
+                ta.write(i,kb.sum(-kb.sum(NN_actions(TrainingSetPiLo(TrainingSet,i))*kb.log(
+                        NN_actions(TrainingSetPiLo(TrainingSet,i))),1)/T,0))
+            responsibilities = ta.stack()
+            pi_b = NN_termination(TrainingSetTermination,training=True)
+            pi_lo = NN_actions(TrainingSetActions,training=True)
+            pi_hi = NN_options(TrainingSet,training=True)
+            loss = RegularizedLoss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions_true, gamma_actions_false, 
+                                       pi_b, pi_hi, pi_lo, responsibilities, lambdas, T, option_space)
+            
+        grads = tape.gradient(loss,weights)
+        optimizer.apply_gradients(zip(grads[0][:], NN_termination.trainable_weights))
+        optimizer.apply_gradients(zip(grads[1][:], NN_actions.trainable_weights))
+        optimizer.apply_gradients(zip(grads[2][:], NN_options.trainable_weights))
+        #optimizer.apply_gradients([(grads[3][:],lambdas)])
+        print('options loss:', float(loss))
+        
+    return loss
+
+            
     
 
     
