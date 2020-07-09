@@ -61,6 +61,7 @@ T = TrainingSet.shape[0]
 TrainingSetTermination = hil.TrainingSetTermination(TrainingSet, option_space)
 TrainingSetActions, labels_reshaped = hil.TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels)
 lambdas = tf.Variable(initial_value=tf.random.normal((option_space,)), trainable=True)
+eta = tf.Variable(initial_value=tf.random.normal((1,)), trainable=True)
 
 for n in range(N):
     print('iter', n, '/', N)
@@ -99,19 +100,28 @@ for n in range(N):
     # loss_termination = hil.OptimizeNNtermination(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, T, optimizer)
     # loss_action = hil.OptimizeNNactions(epochs, TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true, T, optimizer)
     # loss_options = hil.OptimizeNNoptions(epochs, TrainingSet, NN_options, gamma_reshaped_options, T, optimizer)
-    loss = hil.OptimizeLossAndRegularizer(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
-                               TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
-                               TrainingSet, NN_options, gamma_reshaped_options, lambdas, T, optimizer, option_space)
+    # loss = hil.OptimizeLossAndRegularizer1(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
+    #                            TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
+    #                            TrainingSet, NN_options, gamma_reshaped_options, lambdas, T, optimizer, option_space)
+    # loss = hil.OptimizeLossAndRegularizer2(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
+    #                            TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
+    #                            TrainingSet, NN_options, gamma_reshaped_options, eta, T, optimizer, 
+    #                            gamma, option_space, labels)
+    
+    loss = hil.OptimizeLoss(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
+                            TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
+                            TrainingSet, NN_options, gamma_reshaped_options, T, optimizer)
 
     print('Maximization done, Total Loss:',float(loss))#float(loss_options+loss_action+loss_termination))
 
 # %% Evaluation 
-T=1
+Trajs=100
 base=ss.BaseStateIndex(stateSpace,map)
 [trajHIL,controlHIL,OptionsHIL, 
  TerminationHIL, flagHIL]=sim.HierarchicalStochasticSampleTrajMDP(P, stateSpace, NN_options, 
                                                                   NN_actions, NN_termination, mu, 1000, 
-                                                                  T, base, TERMINAL_STATE_INDEX, zeta, option_space)                                                                 
+                                                                  Trajs, base, TERMINAL_STATE_INDEX, zeta, option_space)
+                                                                  
 # %%
 env.HILVideoSimulation(map,stateSpace,controlHIL[0][:],trajHIL[0][:],OptionsHIL[0][:],"sim_HIL.mp4")
 
@@ -121,35 +131,13 @@ Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
 Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
 Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
 
+# %% Behavioral Cloning
+model1 = bc.NN1(action_space)
+model1.fit(TrainingSet, labels, epochs=10)
+predictionsNN1, deterministic_policyNN1 = bc.MakePredictions(model1, stateSpace)
 
-# %%
-# lambdas = tf.Variable(initial_value=tf.random.normal((option_space,)), trainable=True)
-
-
-# ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-# for i in range(option_space):
-#     ta.write(i,kb.sum(-kb.sum(NN_actions(hil.TrainingSetPiLo(stateSpace,i))*kb.log(
-#         NN_actions(hil.TrainingSetPiLo(stateSpace,i))),1)/T,0))
-# responsibilities = ta.stack()
-# values = kb.sum(lambdas*responsibilities)
-
-# # albi = np.sum(np.stack((-np.sum(Pi_Lo_o1*np.log(Pi_Lo_o1),1), -np.sum(Pi_Lo_o2*np.log(Pi_Lo_o2),1), -np.sum(Pi_Lo_o3*np.log(Pi_Lo_o3),1)),1),0)
-
-# # Reg = np.array(([10, 100, 1000]))
-
-# # final = np.multiply(albi,Reg)
-
-
-# indices = tf.range(option_space, dtype='int32').numpy()    
-# lambdas = tf.random.normal((1,option_space))
-
-# values = np.empty(3,)
-# for i in range(option_space):
-#     values[i] = tf.concat(values[i], NN_actions(hil.TrainingSetPiLo(stateSpace,i)))
-
-    
-    
-    
+ntraj = [10, 20, 50, 100, 200, 500, 1000]
+average_NN1, success_percentageNN1, average_expert = bc.EvaluationNN1(map, stateSpace, P, traj, control, ntraj)
 
 
           

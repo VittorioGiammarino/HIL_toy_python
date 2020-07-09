@@ -96,11 +96,11 @@ def EvaluationNN1(map, stateSpace, P, traj, control, ntraj):
 
     for i in range(len(ntraj)):
         action_space=5
-        labels, TrainingSet = ProcessData(traj[1:ntraj[i]][:],control[1:ntraj[i]][:],stateSpace)
+        labels, TrainingSet = ProcessData(traj[0:ntraj[i]][:],control[0:ntraj[i]][:],stateSpace)
         model = NN1(action_space)
-        model.fit(TrainingSet, labels, epochs=10)
+        model.fit(TrainingSet, labels, epochs=100)
         predictions, deterministic_policy = MakePredictions(model, stateSpace)
-        T=1000
+        T=100
         base=ss.BaseStateIndex(stateSpace,map)
         TERMINAL_STATE_INDEX = ss.TerminalStateIndex(stateSpace,map)
         [trajNN,controlNN,flagNN]=sim.StochasticSampleTrajMDP(P, predictions, 1000, T, base, TERMINAL_STATE_INDEX)
@@ -128,7 +128,7 @@ def EvaluationNN2(map, stateSpace, P, traj, control, ntraj):
         labels, TrainingSet = ProcessData(traj[1:ntraj[i]][:],control[1:ntraj[i]][:],stateSpace)
         model = NN2(action_space)
         encoded = tf.keras.utils.to_categorical(labels)
-        model.fit(TrainingSet, encoded, epochs=10)
+        model.fit(TrainingSet, encoded, epochs=100)
         predictions, deterministic_policy = MakePredictions(model, stateSpace)
         T=1000
         base=ss.BaseStateIndex(stateSpace,map)
@@ -158,7 +158,7 @@ def EvaluationNN3(map, stateSpace, P, traj, control, ntraj):
         labels, TrainingSet = ProcessData(traj[1:ntraj[i]][:],control[1:ntraj[i]][:],stateSpace)
         model = NN3(action_space)
         encoded = tf.keras.utils.to_categorical(labels)
-        model.fit(TrainingSet, encoded, epochs=10)
+        model.fit(TrainingSet, encoded, epochs=100)
         predictions, deterministic_policy = MakePredictions(model, stateSpace)
         T=1000
         base=ss.BaseStateIndex(stateSpace,map)

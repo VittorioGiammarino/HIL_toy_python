@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun 25 14:53:43 2020
+Created on Wed Jul  8 16:52:47 2020
 
-@author: Vittorio Giammarino 
+@author: vittorio
 """
+
+
 import tensorflow as tf
 from tensorflow import keras
+import tensorflow.keras.backend as kb
 import numpy as np
 import matplotlib.pyplot as plt
 import Environment as env
@@ -14,6 +17,8 @@ import StateSpace as ss
 import DynamicProgramming as dp
 import Simulation as sim
 import BehavioralCloning as bc
+import HierachicalImitationLearning as hil
+import concurrent.futures
 
 # %% map generation 
 map = env.Generate_world_subgoals_simplified()
@@ -30,63 +35,43 @@ G = dp.ComputeStageCosts(stateSpace,map)
 env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi)
 
 # %% Generate Expert's trajectories
-T=6000
+T=1000
 base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T, base, TERMINAL_STATE_INDEX)
+labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
 
 # %% Simulation
 #env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:])
 
-# %% NN Behavioral Cloning
-action_space=5
-labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
-model1 = bc.NN1(action_space)
-model2 = bc.NN2(action_space)
-model3 = bc.NN3(action_space)
+# %% Behavioral Cloning vs Baum-Welch algorithm
+option_space = 3
+action_space = 5
+termination_space = 2
 
-# train the models
-model1.fit(TrainingSet, labels, epochs=10)
-encoded = tf.keras.utils.to_categorical(labels)
-model2.fit(TrainingSet, encoded, epochs=10)
-model3.fit(TrainingSet, encoded, epochs=10)
-predictionsNN1, deterministic_policyNN1 = bc.MakePredictions(model1, stateSpace)
-predictionsNN2, deterministic_policyNN2 = bc.MakePredictions(model2, stateSpace)
-predictionsNN3, deterministic_policyNN2 = bc.MakePredictions(model3, stateSpace)
-        
-#env.PlotOptimalSolution(map,stateSpace,deterministic_policyNN1)
+N=10 #Iterations
+zeta = 0.1 #Failure factor
+mu = np.ones(option_space)*np.divide(1,option_space) #initial option probability distribution
 
-# %% Simulation of NN 
-T=1
-base=ss.BaseStateIndex(stateSpace,map)
-[trajNN1,controlNN1,flagNN1]=sim.StochasticSampleTrajMDP(P, predictionsNN1, 1000, T, base, TERMINAL_STATE_INDEX)
-#env.VideoSimulation(map,stateSpace,controlNN1[1][:],trajNN1[1][:],"sim_NN1.mp4")
-
-# %% Evaluate Performance
-
-ntraj = [10, 20, 50, 100, 200, 500, 1000]
+ntraj = [1, 2, 5]
 average_NN1, success_percentageNN1, average_expert = bc.EvaluationNN1(map, stateSpace, P, traj, control, ntraj)
-average_NN2, success_percentageNN2, average_expert = bc.EvaluationNN2(map, stateSpace, P, traj, control, ntraj)
-average_NN3, success_percentageNN3, average_expert = bc.EvaluationNN3(map, stateSpace, P, traj, control, ntraj)
+averageBW, success_percentageBW  = hil.EvaluationBW(map, stateSpace, P, traj, control, ntraj, 
+                                                    action_space, option_space, termination_space, 
+                                                    N, zeta, mu)
 
 # %% plot of performance 
 plt.figure()
 plt.subplot(211)
 plt.plot(ntraj, average_NN1,'go--', label = 'Neural Network 1')
-plt.plot(ntraj, average_NN2,'rs--', label = 'Neural Network 2')
-plt.plot(ntraj, average_NN3,'cp--', label = 'Neural Network 3')
+plt.plot(ntraj, averageBW,'rs--', label = 'Hierarchical Policy')
 plt.plot(ntraj, average_expert,'b', label = 'Expert')
 plt.ylabel('Average steps to goal')
 plt.subplot(212)
 plt.plot(ntraj, success_percentageNN1,'go--', label = 'Nerual Network 1')
-plt.plot(ntraj, success_percentageNN2,'rs--', label = 'Nerual Network 2')
-plt.plot(ntraj, success_percentageNN3,'cp--', label = 'Nerual Network 3')
+plt.plot(ntraj, success_percentageBW,'rs--', label = 'Hierarchical Policy')
 plt.plot(ntraj, np.ones((len(ntraj))),'b', label='Expert')
 plt.xlabel('Number of Trajectories')
 plt.ylabel('Percentage of success')
 plt.legend(loc='lower right')
-plt.savefig('evaluation.eps', format='eps')
+plt.savefig('evaluation_BWvsBC.eps', format='eps')
 plt.show()
-
-
-
 
