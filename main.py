@@ -52,7 +52,7 @@ N=10 #Iterations
 zeta = 0.1 #Failure factor
 mu = np.ones(option_space)*np.divide(1,option_space) #initial option probability distribution
 
-ntraj = [1, 2, 5]
+ntraj = [1]
 average_NN1, success_percentageNN1, average_expert = bc.EvaluationNN1(map, stateSpace, P, traj, control, ntraj)
 averageBW, success_percentageBW  = hil.EvaluationBW(map, stateSpace, P, traj, control, ntraj, 
                                                     action_space, option_space, termination_space, 
