@@ -98,7 +98,7 @@ def EvaluationNN1(map, stateSpace, P, traj, control, ntraj):
         action_space=5
         labels, TrainingSet = ProcessData(traj[0:ntraj[i]][:],control[0:ntraj[i]][:],stateSpace)
         model = NN1(action_space)
-        model.fit(TrainingSet, labels, epochs=100)
+        model.fit(TrainingSet, labels, epochs=50)
         predictions, deterministic_policy = MakePredictions(model, stateSpace)
         T=100
         base=ss.BaseStateIndex(stateSpace,map)
@@ -128,7 +128,7 @@ def EvaluationNN2(map, stateSpace, P, traj, control, ntraj):
         labels, TrainingSet = ProcessData(traj[1:ntraj[i]][:],control[1:ntraj[i]][:],stateSpace)
         model = NN2(action_space)
         encoded = tf.keras.utils.to_categorical(labels)
-        model.fit(TrainingSet, encoded, epochs=100)
+        model.fit(TrainingSet, encoded, epochs=50)
         predictions, deterministic_policy = MakePredictions(model, stateSpace)
         T=1000
         base=ss.BaseStateIndex(stateSpace,map)
@@ -158,7 +158,7 @@ def EvaluationNN3(map, stateSpace, P, traj, control, ntraj):
         labels, TrainingSet = ProcessData(traj[1:ntraj[i]][:],control[1:ntraj[i]][:],stateSpace)
         model = NN3(action_space)
         encoded = tf.keras.utils.to_categorical(labels)
-        model.fit(TrainingSet, encoded, epochs=100)
+        model.fit(TrainingSet, encoded, epochs=50)
         predictions, deterministic_policy = MakePredictions(model, stateSpace)
         T=1000
         base=ss.BaseStateIndex(stateSpace,map)

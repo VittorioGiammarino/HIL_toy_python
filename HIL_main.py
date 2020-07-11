@@ -54,7 +54,7 @@ NN_termination = hil.NN_termination(termination_space)
 # %% Baum-Welch for provable HIL iteration
 
 ntraj = 10
-N = 10
+N = 1
 zeta = 0.1
 mu = np.ones(option_space)*np.divide(1,option_space)
 T = TrainingSet.shape[0]
