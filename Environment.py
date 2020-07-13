@@ -84,7 +84,7 @@ def Generate_world_subgoals_simplified():
 
     return map
 
-def PlotOptimalSolution(map,stateSpace,u):
+def PlotOptimalSolution(map,stateSpace,u,name_pick_up, name_drop_off):
 
     mapsize = map.shape
     #count trees
@@ -125,7 +125,7 @@ def PlotOptimalSolution(map,stateSpace,u):
         u_drop[j]=u[i]
         j+=1
     # PICK_UP
-    plt.figure(2)
+    plt.figure()
     plt.plot([0, mapsize[1], mapsize[1], 0, 0],[0, 0, mapsize[0], mapsize[0], 0],'k-')
     plt.plot([base[0], base[0], base[0]+1, base[0]+1, base[0]],
                  [base[1], base[1]+1, base[1]+1, base[1], base[1]],'k-')
@@ -178,9 +178,11 @@ def PlotOptimalSolution(map,stateSpace,u):
         plt.text(stateSpace[p,1]+0.3, stateSpace[p,0]+0.5,txt)
         if p < u.shape[0]-1:
             p=p+2
+            
+    plt.savefig(name_pick_up, format='eps')
 
     # DROP_OFF
-    plt.figure(3)
+    plt.figure()
     plt.plot([0, mapsize[1], mapsize[1], 0, 0],[0, 0, mapsize[0], mapsize[0], 0],'k-')
     plt.plot([base[0], base[0], base[0]+1, base[0]+1, base[0]],
                  [base[1], base[1]+1, base[1]+1, base[1], base[1]],'k-')
@@ -233,6 +235,8 @@ def PlotOptimalSolution(map,stateSpace,u):
         plt.text(stateSpace[p,1]+0.3, stateSpace[p,0]+0.5,txt)
         if p < u.shape[0]:
             p=p+2
+            
+    plt.savefig(name_drop_off, format='eps')
 
 def VideoSimulation(map,stateSpace,u,states,name_video):
     mapsize = map.shape

@@ -632,11 +632,15 @@ def OptimizeLossAndRegularizerTotBatch(epochs, TrainingSetTermination, NN_termin
     return loss
 
 
-def BaumWelch(labels, TrainingSet, action_space, option_space, termination_space, N, zeta, mu, lambdas, eta):
+def BaumWelch(labels, TrainingSet, action_space, option_space, termination_space, N, zeta, mu, lambdas, eta, Triple_weights_init):
     NN_Options = NN_options(option_space)
     NN_Actions = NN_actions(action_space)
     NN_Termination = NN_termination(termination_space)
-
+    
+    NN_Options.set_weights(Triple_weights_init.options_weights)
+    NN_Actions.set_weights(Triple_weights_init.actions_weights)
+    NN_Termination.set_weights(Triple_weights_init.termination_weights)
+    
     T = TrainingSet.shape[0]
     TrainingSet_Termination = TrainingSetTermination(TrainingSet, option_space)
     TrainingSet_Actions, labels_reshaped = TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels)
@@ -670,7 +674,7 @@ def BaumWelch(labels, TrainingSet, action_space, option_space, termination_space
         print('Expectation done')
         print('Starting maximization step')
         optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
-        epochs = 50 #number of iterations for the maximization step
+        epochs = 40 #number of iterations for the maximization step
         
         gamma_tilde_reshaped = GammaTildeReshape(gamma_tilde, option_space)
         gamma_actions_false, gamma_actions_true = GammaReshapeActions(T, option_space, action_space, gamma, labels_reshaped)
@@ -735,15 +739,17 @@ def ValidationBW(labels, TrainingSet, action_space, option_space, termination_sp
     
   
 def EvaluationBW(map, stateSpace, P, traj, control, ntraj, action_space, option_space, termination_space, 
-                                                           N, zeta, mu, lambdas, eta):
+                                                           N, zeta, mu, lambdas, eta, Triple_weights_init):
     averageBW = np.empty((0))
     success_percentageBW = np.empty((0))
+    list_triple_weights = []
 
     for i in range(len(ntraj)):
         labels, TrainingSet = bc.ProcessData(traj[0:ntraj[i]][:],control[0:ntraj[i]][:],stateSpace)
         NN_Termination, NN_Actions, NN_Options = BaumWelch(labels, TrainingSet, 
                                                            action_space, option_space, termination_space, 
-                                                           N, zeta, mu, lambdas, eta)
+                                                           N, zeta, mu, lambdas, eta, Triple_weights_init)
+        list_triple_weights.append(Triple_Weights(NN_Options.get_weights(), NN_Actions.get_weights(), NN_Termination.get_weights()))
         Trajs=100
         base=ss.BaseStateIndex(stateSpace,map)
         TERMINAL_STATE_INDEX = ss.TerminalStateIndex(stateSpace,map)
@@ -757,7 +763,7 @@ def EvaluationBW(map, stateSpace, P, traj, control, ntraj, action_space, option_
         averageBW = np.append(averageBW,np.divide(np.sum(length_trajBW),len(length_trajBW)))
         success_percentageBW = np.append(success_percentageBW,np.divide(np.sum(flagBW),len(length_trajBW)))
       
-    return averageBW, success_percentageBW 
+    return averageBW, success_percentageBW, list_triple_weights
     
     
 class Triple_Weights:
