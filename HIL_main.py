@@ -31,7 +31,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 [J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
 # %% Plot Optimal Solution
-env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi)
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Expert_pickup.eps', 'Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
 T=1
@@ -128,16 +128,91 @@ Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
 Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
 Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
 
-# %% Behavioral Cloning
-ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-for i in range(option_space):
-    ta = ta.write(i,kb.sum(-kb.sum(NN_actions(hil.TrainingSetPiLo(TrainingSet,i))*kb.log(
-                    NN_actions(hil.TrainingSetPiLo(TrainingSet,i))),1)/T,0))
-    responsibilities = ta.stack()
+# %% Understanding Regularization
 
+option_space = 3
+action_space = 5
+termination_space = 2
+
+NN_options = hil.NN_options(option_space)
+NN_actions = hil.NN_actions(action_space)
+NN_termination = hil.NN_termination(termination_space)
+
+ntraj = 10
+N = 1
+zeta = 0.1
+mu = np.ones(option_space)*np.divide(1,option_space)
+T = TrainingSet.shape[0]
+TrainingSetTermination = hil.TrainingSetTermination(TrainingSet, option_space)
+TrainingSetActions, labels_reshaped = hil.TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels)
+lambdas = tf.Variable(initial_value=1.*tf.ones((option_space,)), trainable=False)
+eta = tf.Variable(initial_value=10000., trainable=False)
+
+for n in range(N):
+    print('iter', n, '/', N)
+
+    alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
+    beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
+    gamma = hil.Gamma(TrainingSet, option_space, termination_space, alpha, beta)
+    gamma_tilde = hil.GammaTilde(TrainingSet, labels, beta, alpha, 
+                                  NN_options, NN_actions, NN_termination, zeta, option_space, termination_space)
+
+    optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
+    epochs = 100 #number of iterations for the maximization step
+
+    for epoch in range(epochs):
+        print("\nStart of epoch %d" % (epoch,))
+        
+        
+        with tf.GradientTape() as tape:
+            weights = [NN_termination.trainable_weights, NN_actions.trainable_weights, NN_options.trainable_weights]
+            tape.watch(weights)
+            # Regularization 1
+            regular_loss = 0
+            for i in range(option_space):
+                option =kb.reshape(NN_options(TrainingSet)[:,i],(T,1))
+                option_concat = kb.concatenate((option,option),1)
+                log_gamma = kb.cast(kb.transpose(kb.log(gamma[i,:,:])),'float32' )
+                policy_termination = NN_termination(hil.TrainingSetPiLo(TrainingSet,i))
+                array = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+                for j in range(T):
+                    array = array.write(j,NN_actions(hil.TrainingSetPiLo(TrainingSet,i))[j,kb.cast(labels[j],'int32')])
+                policy_action = array.stack()
+                policy_action_reshaped = kb.reshape(policy_action,(T,1))
+                policy_action_final = kb.concatenate((policy_action_reshaped,policy_action_reshaped),1)
+                
+                regular_loss = regular_loss -kb.sum(policy_action_final*option_concat*policy_termination*log_gamma)/T
+        
+            # Regularization 2
+            ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+            for i in range(option_space):
+                ta = ta.write(i,kb.sum(-kb.sum(NN_actions(hil.TrainingSetPiLo(TrainingSet,i))*kb.log(
+                                NN_actions(hil.TrainingSetPiLo(TrainingSet,i))),1)/T,0))
+            responsibilities = ta.stack()
+    
+            values = kb.sum(lambdas*responsibilities) 
+        
+            loss = eta*regular_loss -values
+
+            
+        grads = tape.gradient(loss,weights)
+        optimizer.apply_gradients(zip(grads[0][:], NN_termination.trainable_weights))
+        optimizer.apply_gradients(zip(grads[1][:], NN_actions.trainable_weights))
+        optimizer.apply_gradients(zip(grads[2][:], NN_options.trainable_weights))
+        print('options loss:', float(loss))
+
+
+# %%
+Pi_HI = np.argmax(NN_options(stateSpace).numpy(),1)  
+pi_hi = NN_options(stateSpace).numpy()
+Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
+Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
+Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
 
           
-
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'option1_pickup_reg.eps', 'option1_dropoff_reg.eps')
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'option2_pickup_reg.eps', 'option2_dropoff_reg.eps')
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o3, 'option3_pickup_reg.eps', 'option3_dropoff_reg.eps')
     
     
 
