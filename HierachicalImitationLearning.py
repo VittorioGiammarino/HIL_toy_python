@@ -315,10 +315,10 @@ def TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels):
     return TrainingSet_reshaped_actions, labels_reshaped
 
 def GammaReshapeActions(T, option_space, action_space, gamma, labels_reshaped):
-    gamma_reshaped = np.empty((int(3*(T)),2),dtype='float32')
+    gamma_reshaped = np.empty((int(option_space*(T)),2),dtype='float32')
     j=0
-    for i in range(0,3*(T),3):
-        gamma_reshaped[i:i+3,:] = gamma[:,:,j]
+    for i in range(0,option_space*(T),option_space):
+        gamma_reshaped[i:i+option_space,:] = gamma[:,:,j]
         j+=1
     
     gamma_actions_false = np.empty((int(option_space*T),action_space))
