@@ -35,11 +35,11 @@ G = dp.ComputeStageCosts(stateSpace,map)
 env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Expert_pickup.eps', 'Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
-T_train=3
+T_train=10
 base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T_train, base, TERMINAL_STATE_INDEX)
 labels_train, TrainingSet_train = bc.ProcessData(traj,control,stateSpace)
-T_validation = 3
+T_validation = 10
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T_validation, base, TERMINAL_STATE_INDEX)
 labels_validation, TrainingSet_validation = bc.ProcessData(traj,control,stateSpace)
 # %% Simulation
@@ -54,8 +54,8 @@ N=10 #Iterations
 zeta = 0.1 #Failure factor
 mu = np.ones(option_space)*np.divide(1,option_space) #initial option probability distribution
 
-gain_lambdas = np.logspace(-1, 1, 7, dtype = 'float32')
-gain_eta = np.logspace(-1, 1, 7, dtype = 'float32')
+gain_lambdas = np.logspace(1, 3, 7, dtype = 'float32')
+gain_eta = np.logspace(1, 3, 7, dtype = 'float32')
 
 list_triple_weights = []
 validation = []
@@ -113,7 +113,7 @@ base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T_train, base, TERMINAL_STATE_INDEX)
 labels_train, TrainingSet_train = bc.ProcessData(traj,control,stateSpace)
 
-ntraj = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+ntraj = [1, 5, 10, 20]
 average_NN1, success_percentageNN1, average_expert = bc.EvaluationNN1(map, stateSpace, P, traj, control, ntraj)
 [averageBW, success_percentageBW,
  list_triple_weights_performance]  = hil.EvaluationBW(map, stateSpace, P, traj, control, ntraj, 
@@ -152,14 +152,14 @@ NN_Termination.set_weights(list_triple_weights_performance[Best].termination_wei
 Pi_HI = np.argmax(NN_Options(stateSpace).numpy(),1)    
 Pi_Lo_o1 = np.argmax(NN_Actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
 Pi_Lo_o2 = np.argmax(NN_Actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
-Pi_Lo_o3 = np.argmax(NN_Actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
+# Pi_Lo_o3 = np.argmax(NN_Actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
 Pi_term_1 = (NN_Termination(hil.TrainingSetPiLo(stateSpace,0)).numpy())
 Pi_term_2 = (NN_Termination(hil.TrainingSetPiLo(stateSpace,1)).numpy())
-Pi_term_3 = (NN_Termination(hil.TrainingSetPiLo(stateSpace,2)).numpy())
+# Pi_term_3 = (NN_Termination(hil.TrainingSetPiLo(stateSpace,2)).numpy())
 
 env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'option1_pickup.eps', 'option1_dropoff.eps')
 env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'option2_pickup.eps', 'option2_dropoff.eps')
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o3, 'option3_pickup.eps', 'option3_dropoff.eps')
+# env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o3, 'option3_pickup.eps', 'option3_dropoff.eps')
 
 # %%
 Trajs=1
