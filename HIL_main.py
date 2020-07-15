@@ -34,7 +34,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Expert_pickup.eps', 'Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
-T=1
+T=3
 base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T, base, TERMINAL_STATE_INDEX)
 labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
@@ -139,14 +139,15 @@ NN_actions = hil.NN_actions(action_space)
 NN_termination = hil.NN_termination(termination_space)
 
 ntraj = 10
-N = 1
+N = 5
 zeta = 0.1
 mu = np.ones(option_space)*np.divide(1,option_space)
 T = TrainingSet.shape[0]
 TrainingSetTermination = hil.TrainingSetTermination(TrainingSet, option_space)
 TrainingSetActions, labels_reshaped = hil.TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels)
-lambdas = tf.Variable(initial_value=1.*tf.ones((option_space,)), trainable=False)
-eta = tf.Variable(initial_value=10000., trainable=False)
+lambdas = tf.Variable(initial_value=10.*tf.ones((option_space,)), trainable=False)
+eta = tf.Variable(initial_value=100., trainable=False)
+chi = tf.Variable(initial_value=0.1, trainable=False)
 
 for n in range(N):
     print('iter', n, '/', N)
@@ -158,7 +159,11 @@ for n in range(N):
                                   NN_options, NN_actions, NN_termination, zeta, option_space, termination_space)
 
     optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
-    epochs = 100 #number of iterations for the maximization step
+    epochs = 50 #number of iterations for the maximization step
+    
+    gamma_tilde_reshaped = hil.GammaTildeReshape(gamma_tilde, option_space)
+    gamma_actions_false, gamma_actions_true = hil.GammaReshapeActions(T, option_space, action_space, gamma, labels_reshaped)
+    gamma_reshaped_options = hil.GammaReshapeOptions(T, option_space, gamma)
 
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch,))
@@ -191,8 +196,23 @@ for n in range(N):
             responsibilities = ta.stack()
     
             values = kb.sum(lambdas*responsibilities) 
+            
+            # Regularization 3
+            ta_op = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+            ta_op = ta_op.write(0,-kb.sum(NN_options(TrainingSet)*kb.log(NN_options(TrainingSet)))/T)
+            resp_options = ta_op.stack()
+    
+            entro_options = chi*resp_options 
+            
+            pi_b = NN_termination(TrainingSetTermination,training=True)
+            pi_lo = NN_actions(TrainingSetActions,training=True)
+            pi_hi = NN_options(TrainingSet,training=True)
+            
+            loss_termination = kb.sum(gamma_tilde_reshaped*kb.log(pi_b))/(T)
+            loss_options = kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
+            loss_action = (kb.sum(gamma_actions_true*kb.log(pi_lo))+kb.sum(gamma_actions_false*kb.log(pi_lo)))/(T)
         
-            loss = eta*regular_loss -values
+            loss = eta*regular_loss #-entro_options #-loss_termination - loss_action -loss_options -entro_options -values
 
             
         grads = tape.gradient(loss,weights)
@@ -209,10 +229,11 @@ Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
 Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
 Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
 
-          
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'option1_pickup_reg.eps', 'option1_dropoff_reg.eps')
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'option2_pickup_reg.eps', 'option2_dropoff_reg.eps')
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o3, 'option3_pickup_reg.eps', 'option3_dropoff_reg.eps')
+
+env.PlotOptimalOptions(map,stateSpace,Pi_HI, 'Figures/pi_hi_pick_up.eps', 'Figures/pi_hi_drop_off.eps')       
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'Figures/option1_pickup_reg.eps', 'Figures/option1_dropoff_reg.eps')
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'Figures/option2_pickup_reg.eps', 'Figures/option2_dropoff_reg.eps')
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o3, 'Figures/option3_pickup_reg.eps', 'Figures/option3_dropoff_reg.eps')
     
     
 
