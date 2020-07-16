@@ -212,13 +212,13 @@ for n in range(N):
             loss_options = kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
             loss_action = (kb.sum(gamma_actions_true*kb.log(pi_lo))+kb.sum(gamma_actions_false*kb.log(pi_lo)))/(T)
         
-            loss = eta*regular_loss #-entro_options #-loss_termination - loss_action -loss_options -entro_options -values
+            loss = -values #eta*regular_loss #-entro_options #-loss_termination - loss_action -loss_options -entro_options -values
 
             
         grads = tape.gradient(loss,weights)
-        optimizer.apply_gradients(zip(grads[0][:], NN_termination.trainable_weights))
+        #optimizer.apply_gradients(zip(grads[0][:], NN_termination.trainable_weights))
         optimizer.apply_gradients(zip(grads[1][:], NN_actions.trainable_weights))
-        optimizer.apply_gradients(zip(grads[2][:], NN_options.trainable_weights))
+        #optimizer.apply_gradients(zip(grads[2][:], NN_options.trainable_weights))
         print('options loss:', float(loss))
 
 
