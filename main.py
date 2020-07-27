@@ -43,7 +43,7 @@ T_validation = 10
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T_validation, base, TERMINAL_STATE_INDEX)
 labels_validation, TrainingSet_validation = bc.ProcessData(traj,control,stateSpace)
 # %% Simulation
-#env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:])
+env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Expert_video_simulation.mov')
 
 # %% Behavioral Cloning vs Baum-Welch algorithm
 option_space = 2
