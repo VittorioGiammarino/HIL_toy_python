@@ -32,7 +32,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 [J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
 # %% Plot Optimal Solution
-env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Expert_pickup.eps', 'Expert_dropoff.eps')
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/Expert_pickup.eps', 'Figures/Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
 T_train=10

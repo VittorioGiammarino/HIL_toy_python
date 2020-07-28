@@ -15,6 +15,7 @@ from tensorflow import keras
 import tensorflow.keras.backend as kb
 import BehavioralCloning as bc
 import concurrent.futures
+import StateSpace as ss
 
 def PreprocessData(bc_data_dir):
 
@@ -46,7 +47,7 @@ def NN_options(option_space,size_input):
     keras.layers.Softmax()
     ])
 
-    tf.keras.utils.plot_model(model, to_file='model_NN_options.png', 
+    tf.keras.utils.plot_model(model, to_file='Figures/FiguresHIL/model_NN_options.png', 
                               show_shapes=True, 
                               show_layer_names=True,
                               expand_nested=True)
@@ -60,7 +61,7 @@ def NN_actions(action_space, size_input):
     keras.layers.Softmax()
     ])
 
-    tf.keras.utils.plot_model(model, to_file='model_NN_actions.png', 
+    tf.keras.utils.plot_model(model, to_file='Figures/FiguresHIL/model_NN_actions.png', 
                               show_shapes=True, 
                               show_layer_names=True,
                               expand_nested=True)
@@ -74,7 +75,7 @@ def NN_termination(termination_space, size_input):
     keras.layers.Softmax()
     ])
 
-    tf.keras.utils.plot_model(model, to_file='model_NN_termination.png', 
+    tf.keras.utils.plot_model(model, to_file='Figures/FiguresHIL/model_NN_termination.png', 
                               show_shapes=True, 
                               show_layer_names=True,
                               expand_nested=True)
@@ -958,6 +959,33 @@ def BaumWelchRegularizer2(EV, eta):
 
         
     return NN_Termination, NN_Actions, NN_Options
+
+def EvaluationBW(map, stateSpace, P, traj, control, ntraj, action_space, option_space, termination_space, 
+                                                           N, zeta, mu, lambdas, eta, Triple_weights_init):
+    averageBW = np.empty((0))
+    success_percentageBW = np.empty((0))
+    list_triple_weights = []
+
+    for i in range(len(ntraj)):
+        labels, TrainingSet = bc.ProcessData(traj[0:ntraj[i]][:],control[0:ntraj[i]][:],stateSpace)
+        NN_Termination, NN_Actions, NN_Options = BaumWelch(labels, TrainingSet, 
+                                                           action_space, option_space, termination_space, 
+                                                           N, zeta, mu, lambdas, eta, Triple_weights_init)
+        list_triple_weights.append(Triple(NN_Options, NN_Actions, NN_Termination))
+        Trajs=100
+        base=ss.BaseStateIndex(stateSpace,map)
+        TERMINAL_STATE_INDEX = ss.TerminalStateIndex(stateSpace,map)
+        [trajBW, controlBW, OptionBW, 
+         TerminationBW, flagBW]=sim.HierarchicalStochasticSampleTrajMDP(P, stateSpace, NN_Options, NN_Actions, NN_Termination, 
+                                                                        mu, 1000, Trajs, base, TERMINAL_STATE_INDEX, 
+                                                                        zeta, option_space)
+        length_trajBW = np.empty((0))
+        for j in range(len(trajBW)):
+            length_trajBW = np.append(length_trajBW, len(trajBW[j][:]))
+        averageBW = np.append(averageBW,np.divide(np.sum(length_trajBW),len(length_trajBW)))
+        success_percentageBW = np.append(success_percentageBW,np.divide(np.sum(flagBW),len(length_trajBW)))
+      
+    return averageBW, success_percentageBW, list_triple_weights
     
 class Triple:
     def __init__(self, NN_options, NN_actions, NN_termination):
@@ -968,15 +996,15 @@ class Triple:
         self.actions_weights = NN_actions.get_weights()
         self.termination_weights = NN_termination.get_weights()
         
-    def save(self):
-        self.NN_options.save('NN_options')
-        self.NN_actions.save('NN_actions')
-        self.NN_termination.save('NN_termination')
+    def save(self, lambdas, eta):
+        self.NN_options.save('H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
+        self.NN_actions.save('H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
+        self.NN_termination.save('H_model_lambda_{}_eta_{}/NN_termination'.format(lambdas,eta))
         
-    def load():
-        NN_options = keras.models.load_model('NN_options')
-        NN_actions = keras.models.load_model('NN_actions')
-        NN_termination = keras.models.load_model('NN_termination')
+    def load(lambdas, eta):
+        NN_options = keras.models.load_model('H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
+        NN_actions = keras.models.load_model('H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
+        NN_termination = keras.models.load_model('H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
         
         return NN_options, NN_actions, NN_termination
     

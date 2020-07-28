@@ -14,9 +14,9 @@ import Simulation as sim
 import BehavioralCloning as bc
 import concurrent.futures
 
-def NN_options(option_space):
+def NN_options(option_space,size_input):
     model = keras.Sequential([
-    keras.layers.Dense(300, activation='relu', input_shape=(3,)),
+    keras.layers.Dense(300, activation='relu', input_shape=(size_input,)),
     keras.layers.Dense(option_space),
     keras.layers.Softmax()
     ])
@@ -28,9 +28,9 @@ def NN_options(option_space):
     
     return model
 
-def NN_actions(action_space):
+def NN_actions(action_space, size_input):
     model = keras.Sequential([
-    keras.layers.Dense(300, activation='relu', input_shape=(4,)),
+    keras.layers.Dense(300, activation='relu', input_shape=(size_input+1,)),
     keras.layers.Dense(action_space),
     keras.layers.Softmax()
     ])
@@ -42,9 +42,9 @@ def NN_actions(action_space):
     
     return model
 
-def NN_termination(termination_space):
+def NN_termination(termination_space, size_input):
     model = keras.Sequential([
-    keras.layers.Dense(300, activation='relu', input_shape=(4,)),
+    keras.layers.Dense(300, activation='relu', input_shape=(size_input+1,)),
     keras.layers.Dense(termination_space),
     keras.layers.Softmax()
     ])
@@ -253,10 +253,10 @@ def GammaTilde(TrainingSet, labels, beta, alpha, Pi_hi_parameterization, Pi_lo_p
         
     return gamma_tilde
     
-def TrainingSetTermination(TrainingSet,option_space):
+def TrainingSetTermination(TrainingSet,option_space, size_input):
     # Processing termination
     T = len(TrainingSet)
-    TrainingSet_reshaped_termination = np.empty((int(option_space*(T-1)),4))
+    TrainingSet_reshaped_termination = np.empty((int(option_space*(T-1)),size_input+1))
     j=1
     for i in range(0,option_space*(T-1),option_space):
         for k in range(option_space):
@@ -302,8 +302,8 @@ def OptimizeNNtermination(epochs, TrainingSetTermination, NN_termination, gamma_
     return loss_termination
     
         
-def TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels):
-    TrainingSet_reshaped_actions = np.empty((int(option_space*(T)),4))
+def TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels, size_input):
+    TrainingSet_reshaped_actions = np.empty((int(option_space*(T)),size_input+1))
     labels_reshaped = np.empty((int(option_space*(T)),1))
     j=0
     for i in range(0,option_space*(T),option_space):
@@ -396,10 +396,10 @@ def OptimizeNNoptions(epochs, TrainingSet, NN_options, gamma_reshaped_options, T
         
     return loss_options
 
-def TrainingSetPiLo(TrainingSet,o):
+def TrainingSetPiLo(TrainingSet,o, size_input):
     # Processing termination
     T = len(TrainingSet)
-    TrainingSet_PiLo = np.empty((T,4))
+    TrainingSet_PiLo = np.empty((T,size_input+1))
     for i in range(T):
         TrainingSet_PiLo[i,:] = np.append(TrainingSet[i,:], [[o]])
         
@@ -539,7 +539,7 @@ def OptimizeLossAndRegularizer2(epochs, TrainingSetTermination, NN_termination, 
 
 def RegularizedLossTot(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions_true, gamma_actions_false, 
                     NN_termination, NN_options, NN_actions,TrainingSetTermination, TrainingSetActions, 
-                    TrainingSet, eta, lambdas, gamma, T, option_space, labels):
+                    TrainingSet, eta, lambdas, gamma, T, option_space, labels, size_input):
     
     pi_b = NN_termination(TrainingSetTermination,training=True)
     pi_lo = NN_actions(TrainingSetActions,training=True)
@@ -551,10 +551,10 @@ def RegularizedLossTot(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actio
         option =kb.reshape(NN_options(TrainingSet)[:,i],(T,1))
         option_concat = kb.concatenate((option,option),1)
         log_gamma = kb.cast(kb.transpose(kb.log(gamma[i,:,:])),'float32' )
-        policy_termination = NN_termination(TrainingSetPiLo(TrainingSet,i))
+        policy_termination = NN_termination(TrainingSetPiLo(TrainingSet,i,size_input))
         array = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
         for j in range(T):
-            array = array.write(j,NN_actions(TrainingSetPiLo(TrainingSet,i))[j,kb.cast(labels[j],'int32')])
+            array = array.write(j,NN_actions(TrainingSetPiLo(TrainingSet,i,size_input))[j,kb.cast(labels[j],'int32')])
         policy_action = array.stack()
         policy_action_reshaped = kb.reshape(policy_action,(T,1))
         policy_action_final = kb.concatenate((policy_action_reshaped,policy_action_reshaped),1)
@@ -563,8 +563,8 @@ def RegularizedLossTot(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actio
     # Regularization 2
     ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
     for i in range(option_space):
-        ta = ta.write(i,kb.sum(-kb.sum(NN_actions(TrainingSetPiLo(TrainingSet,i))*kb.log(
-                        NN_actions(TrainingSetPiLo(TrainingSet,i))),1)/T,0))
+        ta = ta.write(i,kb.sum(-kb.sum(NN_actions(TrainingSetPiLo(TrainingSet,i,size_input))*kb.log(
+                        NN_actions(TrainingSetPiLo(TrainingSet,i,size_input))),1)/T,0))
     responsibilities = ta.stack()
     
     values = kb.sum(lambdas*responsibilities) 
@@ -581,7 +581,7 @@ def RegularizedLossTot(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actio
 def OptimizeLossAndRegularizerTot(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
                                TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
                                TrainingSet, NN_options, gamma_reshaped_options, eta, lambdas, T, optimizer, 
-                               gamma, option_space, labels):
+                               gamma, option_space, labels, size_input):
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch,))
         
@@ -591,7 +591,7 @@ def OptimizeLossAndRegularizerTot(epochs, TrainingSetTermination, NN_termination
             tape.watch(weights)
             loss = RegularizedLossTot(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions_true, gamma_actions_false, 
                     NN_termination, NN_options, NN_actions,TrainingSetTermination, TrainingSetActions, 
-                    TrainingSet, eta, lambdas, gamma, T, option_space, labels)
+                    TrainingSet, eta, lambdas, gamma, T, option_space, labels, size_input)
 
             
         grads = tape.gradient(loss,weights)
@@ -605,7 +605,7 @@ def OptimizeLossAndRegularizerTot(epochs, TrainingSetTermination, NN_termination
 def OptimizeLossAndRegularizerTotBatch(epochs, TrainingSetTermination, NN_termination, gamma_tilde_reshaped, 
                                TrainingSetActions, NN_actions, gamma_actions_false, gamma_actions_true,
                                TrainingSet, NN_options, gamma_reshaped_options, eta, lambdas, T, optimizer, 
-                               gamma, option_space, labels, size_batch):
+                               gamma, option_space, labels, size_input, size_batch):
     
     n_batches = np.int(TrainingSet.shape[0]/size_batch)
     
@@ -613,13 +613,20 @@ def OptimizeLossAndRegularizerTotBatch(epochs, TrainingSetTermination, NN_termin
         print("\nStart of epoch %d" % (epoch,))
         
         for n in range(n_batches):
+            print("\n Batch %d" % (n+1,))
             with tf.GradientTape() as tape:
                 weights = [NN_termination.trainable_weights, NN_actions.trainable_weights, NN_options.trainable_weights]
                 tape.watch(weights)
-                loss = RegularizedLossTot(gamma_tilde_reshaped[n*(T-1)*option_space:n*(T-1)*option_space+size_batch], 
-                                          gamma_reshaped_options[n*(T-1):n*(T-1)+size_batch], gamma_actions_true, gamma_actions_false, 
-                                          NN_termination, NN_options, NN_actions,TrainingSetTermination, TrainingSetActions, 
-                                          TrainingSet, eta, lambdas, gamma, T, option_space, labels)
+                loss = RegularizedLossTot(gamma_tilde_reshaped[option_space*n*size_batch:option_space*(n+1)*size_batch,:], 
+                                          gamma_reshaped_options[n*size_batch:(n+1)*size_batch,:], 
+                                          gamma_actions_true[option_space*n*size_batch:option_space*(n+1)*size_batch,:], 
+                                          gamma_actions_false[option_space*n*size_batch:option_space*(n+1)*size_batch,:], 
+                                          NN_termination, NN_options, NN_actions,
+                                          TrainingSetTermination[option_space*n*size_batch:option_space*(n+1)*size_batch,:], 
+                                          TrainingSetActions[option_space*n*size_batch:option_space*(n+1)*size_batch,:], 
+                                          TrainingSet[n*size_batch:(n+1)*size_batch,:], 
+                                          eta, lambdas, gamma[:,:,n*size_batch:(n+1)*size_batch], 
+                                          size_batch, option_space, labels, size_input)
 
             
             grads = tape.gradient(loss,weights)

@@ -18,7 +18,7 @@ import BehavioralCloning as bc
 # %% map generation 
 map = env.Generate_world_subgoals_simplified()
 
-# %% Generate State Space
+# %% Generate State Space and Expert's Solution
 stateSpace=ss.GenerateStateSpace(map)            
 K = stateSpace.shape[0];
 TERMINAL_STATE_INDEX = ss.TerminalStateIndex(stateSpace,map)
@@ -27,15 +27,15 @@ G = dp.ComputeStageCosts(stateSpace,map)
 [J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
 # %% Plot Optimal Solution
-env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi)
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresBC/Expert_pickup.eps', 'Figures/FiguresBC/Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
-T=6000
+T=6000 # Number of trajectories we wish to generate
 base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T, base, TERMINAL_STATE_INDEX)
 
 # %% Simulation
-#env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:])
+env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Videos/VideosBC/Expert_video_simulation.mp4')
 
 # %% NN Behavioral Cloning
 action_space=5
@@ -53,13 +53,13 @@ predictionsNN1, deterministic_policyNN1 = bc.MakePredictions(model1, stateSpace)
 predictionsNN2, deterministic_policyNN2 = bc.MakePredictions(model2, stateSpace)
 predictionsNN3, deterministic_policyNN2 = bc.MakePredictions(model3, stateSpace)
         
-#env.PlotOptimalSolution(map,stateSpace,deterministic_policyNN1)
+env.PlotOptimalSolution(map,stateSpace,deterministic_policyNN1, 'Figures/FiguresBC/NN1_pickup.eps', 'Figures/FiguresBC/NN1_dropoff.eps')
 
 # %% Simulation of NN 
 T=1
 base=ss.BaseStateIndex(stateSpace,map)
 [trajNN1,controlNN1,flagNN1]=sim.StochasticSampleTrajMDP(P, predictionsNN1, 1000, T, base, TERMINAL_STATE_INDEX)
-#env.VideoSimulation(map,stateSpace,controlNN1[1][:],trajNN1[1][:],"sim_NN1.mp4")
+env.VideoSimulation(map,stateSpace,controlNN1[0][:],trajNN1[0][:],"Videos/VideosBC/sim_NN1.mp4")
 
 # %% Evaluate Performance
 
@@ -84,7 +84,7 @@ plt.plot(ntraj, np.ones((len(ntraj))),'b', label='Expert')
 plt.xlabel('Number of Trajectories')
 plt.ylabel('Percentage of success')
 plt.legend(loc='lower right')
-plt.savefig('evaluation.eps', format='eps')
+plt.savefig('Figures/FiguresBC/evaluationBehavioralCloning.eps', format='eps')
 plt.show()
 
 

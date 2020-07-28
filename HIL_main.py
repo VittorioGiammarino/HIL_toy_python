@@ -31,7 +31,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 [J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
 # %% Plot Optimal Solution
-env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Expert_pickup.eps', 'Expert_dropoff.eps')
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresHIL/Expert_pickup.eps', 'Figures/FiguresHIL/Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
 T=10
@@ -40,7 +40,7 @@ base=ss.BaseStateIndex(stateSpace,map)
 labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
 
 # %% Simulation
-#env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:])
+env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Videos/VideosHIL/Expert_video_simulation.mp4')
 
 # %% Triple parameterization
 option_space = 2
@@ -52,9 +52,60 @@ NN_options = hil.NN_options(option_space, size_input)
 NN_actions = hil.NN_actions(action_space, size_input)
 NN_termination = hil.NN_termination(termination_space, size_input)
 
-# %% Baum-Welch for provable HIL iteration
+N=10 #Iterations
+zeta = 0.1 #Failure factor
+mu = np.ones(option_space)*np.divide(1,option_space) #initial option probability distribution
 
-ntraj = 10
+gain_lambdas = np.logspace(-2, 3, 3, dtype = 'float32')
+gain_eta = np.logspace(-2, 3, 3, dtype = 'float32')
+ETA, LAMBDAS = np.meshgrid(gain_eta, gain_lambdas)
+LAMBDAS = LAMBDAS.reshape(len(gain_lambdas)*len(gain_eta),)
+ETA = ETA.reshape(len(gain_lambdas)*len(gain_eta),)
+
+Triple = hil.Triple(NN_options, NN_actions, NN_termination)
+
+env_name = 'Drone'
+max_epoch = 1000
+
+ED = hil.Experiment_design(labels, TrainingSet, size_input, action_space, option_space, termination_space, N, zeta, mu, 
+                           Triple, LAMBDAS, ETA, env_name, max_epoch)
+
+# %% Understanding Regularization: Regularizer 1 (maximize entropy of pi_lo for each option)
+
+lambdas = tf.Variable(initial_value=1.*tf.ones((option_space,)), trainable=False)
+NN_Termination, NN_Actions, NN_Options = hil.BaumWelchRegularizer1(ED, lambdas)
+Triple_reg1 = hil.Triple(NN_Options, NN_Actions, NN_Termination)
+
+Pi_HI = np.argmax(Triple_reg1.NN_options(stateSpace).numpy(),1)  
+pi_hi = Triple_reg1.NN_options(stateSpace).numpy()
+Pi_Lo_o1 = np.argmax(Triple_reg1.NN_actions(hil.TrainingSetPiLo(stateSpace,0, size_input)).numpy(),1)
+Pi_Lo_o2 = np.argmax(Triple_reg1.NN_actions(hil.TrainingSetPiLo(stateSpace,1, size_input)).numpy(),1)
+
+
+env.PlotOptimalOptions(map,stateSpace,Pi_HI, 'Figures/FiguresHIL/Reg1/pi_hi_pick_up.eps', 'Figures/FiguresHIL/Reg1/pi_hi_drop_off.eps')       
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'Figures/FiguresHIL/Reg1/option1_pickup_reg.eps', 'Figures/FiguresHIL/Reg1/option1_dropoff_reg.eps')
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'Figures/FiguresHIL/Reg1/option2_pickup_reg.eps', 'Figures/FiguresHIL/Reg1/option2_dropoff_reg.eps')
+
+
+# %% Understanding Regularization: Regularizer 2 (Minimize expectation of the responsibilities)
+
+eta = tf.Variable(initial_value=1., trainable=False)
+
+NN_Termination, NN_Actions, NN_Options = hil.BaumWelchRegularizer2(ED, eta)
+Triple_reg2 = hil.Triple(NN_Options, NN_Actions, NN_Termination)
+
+Pi_HI = np.argmax(Triple_reg2.NN_options(stateSpace).numpy(),1)  
+pi_hi = Triple_reg2.NN_options(stateSpace).numpy()
+Pi_Lo_o1 = np.argmax(Triple_reg2.NN_actions(hil.TrainingSetPiLo(stateSpace,0, size_input)).numpy(),1)
+Pi_Lo_o2 = np.argmax(Triple_reg2.NN_actions(hil.TrainingSetPiLo(stateSpace,1, size_input)).numpy(),1)
+
+
+env.PlotOptimalOptions(map,stateSpace,Pi_HI, 'Figures/FiguresHIL/Reg2/pi_hi_pick_up.eps', 'Figures/FiguresHIL/Reg2/pi_hi_drop_off.eps')       
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'Figures/FiguresHIL/Reg2/option1_pickup_reg.eps', 'Figures/FiguresHIL/Reg2/option1_dropoff_reg.eps')
+env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'Figures/FiguresHIL/Reg2/option2_pickup_reg.eps', 'Figures/FiguresHIL/Reg2/option2_dropoff_reg.eps')
+        
+        
+# %% Baum-Welch for provable HIL iteration
 
 N = 10
 zeta = 0.1
@@ -114,6 +165,15 @@ for n in range(N):
 
     print('Maximization done, Total Loss:',float(loss))#float(loss_options+loss_action+loss_termination))
 
+# %% Save Model
+lambda_gain = lambdas.numpy()[0]
+eta_gain = eta.numpy()
+
+Triple_model = hil.Triple(NN_options, NN_actions, NN_termination)
+Triple_model.save(lambda_gain, eta_gain)
+
+# %% Load Model
+NN_options, NN_actions, NN_termination = hil.Triple.load(lambda_gain, eta_gain)
 
 # %% Evaluation 
 Trajs=100
@@ -129,121 +189,10 @@ for j in range(len(trajHIL)):
                                                                   
 best = np.argmin(length_trajHIL)                                                                  
                                                                   
-# %%
-env.HILVideoSimulation(map,stateSpace,controlHIL[best][:],trajHIL[best][:],OptionsHIL[0][:],"sim_HIL.mp4")
-
-# %%
-Pi_HI = NN_options(stateSpace).numpy()    
-Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
-Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
-Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
-
-# %% Understanding Regularization
-
-option_space = 3
-action_space = 5
-termination_space = 2
-
-NN_options = hil.NN_options(option_space)
-NN_actions = hil.NN_actions(action_space)
-NN_termination = hil.NN_termination(termination_space)
-
-ntraj = 10
-N = 5
-zeta = 0.1
-mu = np.ones(option_space)*np.divide(1,option_space)
-T = TrainingSet.shape[0]
-TrainingSetTermination = hil.TrainingSetTermination(TrainingSet, option_space)
-TrainingSetActions, labels_reshaped = hil.TrainingAndLabelsReshaped(option_space,T, TrainingSet, labels)
-lambdas = tf.Variable(initial_value=10.*tf.ones((option_space,)), trainable=False)
-eta = tf.Variable(initial_value=100., trainable=False)
-chi = tf.Variable(initial_value=0.1, trainable=False)
-
-for n in range(N):
-    print('iter', n, '/', N)
-
-    alpha = hil.Alpha(TrainingSet, labels, option_space, termination_space, mu, zeta, NN_options, NN_actions, NN_termination)
-    beta = hil.Beta(TrainingSet, labels, option_space, termination_space, zeta, NN_options, NN_actions, NN_termination)
-    gamma = hil.Gamma(TrainingSet, option_space, termination_space, alpha, beta)
-    gamma_tilde = hil.GammaTilde(TrainingSet, labels, beta, alpha, 
-                                  NN_options, NN_actions, NN_termination, zeta, option_space, termination_space)
-
-    optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
-    epochs = 50 #number of iterations for the maximization step
-    
-    gamma_tilde_reshaped = hil.GammaTildeReshape(gamma_tilde, option_space)
-    gamma_actions_false, gamma_actions_true = hil.GammaReshapeActions(T, option_space, action_space, gamma, labels_reshaped)
-    gamma_reshaped_options = hil.GammaReshapeOptions(T, option_space, gamma)
-
-    for epoch in range(epochs):
-        print("\nStart of epoch %d" % (epoch,))
-        
-        
-        with tf.GradientTape() as tape:
-            weights = [NN_termination.trainable_weights, NN_actions.trainable_weights, NN_options.trainable_weights]
-            tape.watch(weights)
-            # Regularization 1
-            regular_loss = 0
-            for i in range(option_space):
-                option =kb.reshape(NN_options(TrainingSet)[:,i],(T,1))
-                option_concat = kb.concatenate((option,option),1)
-                log_gamma = kb.cast(kb.transpose(kb.log(gamma[i,:,:])),'float32' )
-                policy_termination = NN_termination(hil.TrainingSetPiLo(TrainingSet,i))
-                array = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-                for j in range(T):
-                    array = array.write(j,NN_actions(hil.TrainingSetPiLo(TrainingSet,i))[j,kb.cast(labels[j],'int32')])
-                policy_action = array.stack()
-                policy_action_reshaped = kb.reshape(policy_action,(T,1))
-                policy_action_final = kb.concatenate((policy_action_reshaped,policy_action_reshaped),1)
-                
-                regular_loss = regular_loss -kb.sum(policy_action_final*option_concat*policy_termination*log_gamma)/T
-        
-            # Regularization 2
-            ta = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-            for i in range(option_space):
-                ta = ta.write(i,kb.sum(-kb.sum(NN_actions(hil.TrainingSetPiLo(TrainingSet,i))*kb.log(
-                                NN_actions(hil.TrainingSetPiLo(TrainingSet,i))),1)/T,0))
-            responsibilities = ta.stack()
-    
-            values = kb.sum(lambdas*responsibilities) 
-            
-            # Regularization 3
-            ta_op = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-            ta_op = ta_op.write(0,-kb.sum(NN_options(TrainingSet)*kb.log(NN_options(TrainingSet)))/T)
-            resp_options = ta_op.stack()
-    
-            entro_options = chi*resp_options 
-            
-            pi_b = NN_termination(TrainingSetTermination,training=True)
-            pi_lo = NN_actions(TrainingSetActions,training=True)
-            pi_hi = NN_options(TrainingSet,training=True)
-            
-            loss_termination = kb.sum(gamma_tilde_reshaped*kb.log(pi_b))/(T)
-            loss_options = kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
-            loss_action = (kb.sum(gamma_actions_true*kb.log(pi_lo))+kb.sum(gamma_actions_false*kb.log(pi_lo)))/(T)
-        
-            loss = -values #eta*regular_loss #-entro_options #-loss_termination - loss_action -loss_options -entro_options -values
-
-            
-        grads = tape.gradient(loss,weights)
-        #optimizer.apply_gradients(zip(grads[0][:], NN_termination.trainable_weights))
-        optimizer.apply_gradients(zip(grads[1][:], NN_actions.trainable_weights))
-        #optimizer.apply_gradients(zip(grads[2][:], NN_options.trainable_weights))
-        print('options loss:', float(loss))
+# %% Video of Best Simulation
+env.HILVideoSimulation(map,stateSpace,controlHIL[best][:],trajHIL[best][:],OptionsHIL[0][:],"Videos/VideosHIL/sim_HIL.mp4")
 
 
-# %%
-Pi_HI = np.argmax(NN_options(stateSpace).numpy(),1)  
-pi_hi = NN_options(stateSpace).numpy()
-Pi_Lo_o1 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,0)).numpy(),1)
-Pi_Lo_o2 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,1)).numpy(),1)
-Pi_Lo_o3 = np.argmax(NN_actions(hil.TrainingSetPiLo(stateSpace,2)).numpy(),1)
-
-
-env.PlotOptimalOptions(map,stateSpace,Pi_HI, 'Figures/pi_hi_pick_up.eps', 'Figures/pi_hi_drop_off.eps')       
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o1, 'Figures/option1_pickup_reg.eps', 'Figures/option1_dropoff_reg.eps')
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o2, 'Figures/option2_pickup_reg.eps', 'Figures/option2_dropoff_reg.eps')
-env.PlotOptimalSolution(map,stateSpace,Pi_Lo_o3, 'Figures/option3_pickup_reg.eps', 'Figures/option3_dropoff_reg.eps')
     
     
 
