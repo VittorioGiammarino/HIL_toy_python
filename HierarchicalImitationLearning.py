@@ -732,10 +732,13 @@ def ValidationBW_reward(i, Experiment_Vars):
         eta = tf.Variable(initial_value=Experiment_Vars.gain_eta[i], trainable=False)
         NN_Termination, NN_Actions, NN_Options = BaumWelch(Experiment_Vars, lambdas, eta)
         list_triple = Triple(NN_Options, NN_Actions, NN_Termination)
+        base=ss.BaseStateIndex(Experiment_Vars.env.stateSpace,Experiment_Vars.env.map)
+        TERMINAL_STATE_INDEX = ss.TerminalStateIndex(Experiment_Vars.env.stateSpace, Experiment_Vars.env.map)
         [trajHIL, controlHIL, optionHIL, 
-         terminationHIL, flagHIL] = sim.HierarchicalPolicySim(Experiment_Vars.env, list_triple, 
-                                                              Experiment_Vars.zeta, Experiment_Vars.mu, Experiment_Vars.max_epoch, 
-                                                              100, Experiment_Vars.option_space, Experiment_Vars.size_input)
+         terminationHIL, flagHIL] = sim.HierarchicalStochasticSampleTrajMDP(Experiment_Vars.env.P, Experiment_Vars.env.stateSpace, 
+                                                                            NN_Options, NN_Actions, NN_Termination, Experiment_Vars.mu, 
+                                                                            Experiment_Vars.max_epoch, 100, base, TERMINAL_STATE_INDEX, 
+                                                                            Experiment_Vars.zeta, Experiment_Vars.option_space)
         length_traj = np.empty((0))
         for j in range(len(trajHIL)):
             length_traj = np.append(length_traj, len(trajHIL[j][:]))
@@ -997,16 +1000,22 @@ class Triple:
         self.termination_weights = NN_termination.get_weights()
         
     def save(self, lambdas, eta):
-        self.NN_options.save('H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
-        self.NN_actions.save('H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
-        self.NN_termination.save('H_model_lambda_{}_eta_{}/NN_termination'.format(lambdas,eta))
+        self.NN_options.save('Triple_models/H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
+        self.NN_actions.save('Triple_models/H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
+        self.NN_termination.save('Triple_models/H_model_lambda_{}_eta_{}/NN_termination'.format(lambdas,eta))
         
     def load(lambdas, eta):
-        NN_options = keras.models.load_model('H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
-        NN_actions = keras.models.load_model('H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
-        NN_termination = keras.models.load_model('H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
+        NN_options = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
+        NN_actions = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
+        NN_termination = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
         
         return NN_options, NN_actions, NN_termination
+
+class Environment_specs:
+    def __init__(self, P, stateSpace, map):
+        self.P = P
+        self.stateSpace = stateSpace
+        self.map = map
     
 class Experiment_design:
     def __init__(self, labels, TrainingSet, size_input, action_space, option_space, termination_space, N, zeta, mu, Triple_init, gain_lambdas,
@@ -1025,6 +1034,24 @@ class Experiment_design:
         self.gain_eta = gain_eta
         self.env = env
         self.max_epoch = max_epoch
+        
+    def ValidationBW_reward(self, i):
+        lambdas = tf.Variable(initial_value=self.gain_lambdas[i]*tf.ones((self.option_space,)), trainable=False)
+        eta = tf.Variable(initial_value=self.gain_eta[i], trainable=False)
+        NN_Termination, NN_Actions, NN_Options = BaumWelch(self, lambdas, eta)
+        list_triple = Triple(NN_Options, NN_Actions, NN_Termination)
+        [trajHIL, controlHIL, optionHIL, 
+         terminationHIL, flagHIL] = sim.HierarchicalPolicySim(self.env, list_triple, 
+                                                              self.zeta, self.mu, self.max_epoch, 
+                                                              100, self.option_space, self.size_input)
+        length_traj = np.empty((0))
+        for j in range(len(trajHIL)):
+            length_traj = np.append(length_traj, len(trajHIL[j][:]))
+        averageHIL = np.divide(np.sum(length_traj),len(length_traj))
+        success_percentageHIL = np.divide(np.sum(flagHIL),len(length_traj))
+        
+        return list_triple, averageHIL, success_percentageHIL
+        
     
 
 

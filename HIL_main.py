@@ -31,7 +31,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 [J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
 # %% Plot Optimal Solution
-env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresHIL/Expert_pickup.eps', 'Figures/FiguresHIL/Expert_dropoff.eps')
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresExpert/Expert_pickup.eps', 'Figures/FiguresExpert/Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
 T=10
@@ -40,9 +40,9 @@ base=ss.BaseStateIndex(stateSpace,map)
 labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
 
 # %% Simulation
-env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Videos/VideosHIL/Expert_video_simulation.mp4')
+env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Videos/VideosExpert/Expert_video_simulation.mp4')
 
-# %% Triple parameterization
+# %% HIL initialization
 option_space = 2
 action_space = 5
 termination_space = 2
@@ -64,11 +64,13 @@ ETA = ETA.reshape(len(gain_lambdas)*len(gain_eta),)
 
 Triple = hil.Triple(NN_options, NN_actions, NN_termination)
 
-env_name = 'Drone'
+env_specs = hil.Environment_specs(P, stateSpace, map)
+
 max_epoch = 1000
 
 ED = hil.Experiment_design(labels, TrainingSet, size_input, action_space, option_space, termination_space, N, zeta, mu, 
-                           Triple, LAMBDAS, ETA, env_name, max_epoch)
+                           Triple, LAMBDAS, ETA, env_specs, max_epoch)
+
 
 # %% Understanding Regularization: Regularizer 1 (maximize entropy of pi_lo for each option)
 
@@ -173,6 +175,11 @@ Triple_model = hil.Triple(NN_options, NN_actions, NN_termination)
 Triple_model.save(lambda_gain, eta_gain)
 
 # %% Load Model
+
+lambdas = tf.Variable(initial_value=1.*tf.ones((option_space,)), trainable=False)
+eta = tf.Variable(initial_value=100., trainable=False)
+lambda_gain = lambdas.numpy()[0]
+eta_gain = eta.numpy()
 NN_options, NN_actions, NN_termination = hil.Triple.load(lambda_gain, eta_gain)
 
 # %% Evaluation 

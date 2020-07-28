@@ -27,7 +27,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 [J_opt_vi,u_opt_ind_vi] = dp.ValueIteration(P,G,TERMINAL_STATE_INDEX)
 
 # %% Plot Optimal Solution
-env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresBC/Expert_pickup.eps', 'Figures/FiguresBC/Expert_dropoff.eps')
+env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresExpert/Expert_pickup.eps', 'Figures/FiguresExpert/Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
 T=6000 # Number of trajectories we wish to generate
@@ -35,7 +35,7 @@ base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T, base, TERMINAL_STATE_INDEX)
 
 # %% Simulation
-env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Videos/VideosBC/Expert_video_simulation.mp4')
+env.VideoSimulation(map,stateSpace,control[1][:],traj[1][:], 'Videos/VideosExpert/Expert_video_simulation.mp4')
 
 # %% NN Behavioral Cloning
 action_space=5
