@@ -666,9 +666,13 @@ def OptimizeLossAndRegularizerTotBatch(epochs, TrainingSetTermination, NN_termin
 
 
 def BaumWelch(EV, lambdas, eta):
-    NN_Options = EV.Triple_init.NN_options
-    NN_Actions = EV.Triple_init.NN_actions
-    NN_Termination = EV.Triple_init.NN_termination
+    NN_Options = NN_options(EV.option_space, EV.size_input)
+    NN_Actions = NN_actions(EV.action_space, EV.size_input)
+    NN_Termination = NN_termination(EV.termination_space, EV.size_input)
+    
+    NN_Options.set_weights(EV.Triple_init.options_weights)
+    NN_Actions.set_weights(EV.Triple_init.actions_weights)
+    NN_Termination.set_weights(EV.Triple_init.termination_weights)
         
     T = EV.TrainingSet.shape[0]
     TrainingSet_Termination = TrainingSetTermination(EV.TrainingSet, EV.option_space, EV.size_input)
@@ -827,9 +831,13 @@ def OptimizeRegularizer1Batch(epochs, NN_termination, NN_actions,
     return loss    
   
 def BaumWelchRegularizer1(EV, lambdas):
-    NN_Options = EV.Triple_init.NN_options
-    NN_Actions = EV.Triple_init.NN_actions
-    NN_Termination = EV.Triple_init.NN_termination
+    NN_Options = NN_options(EV.option_space, EV.size_input)
+    NN_Actions = NN_actions(EV.action_space, EV.size_input)
+    NN_Termination = NN_termination(EV.termination_space, EV.size_input)
+    
+    NN_Options.set_weights(EV.Triple_init.options_weights)
+    NN_Actions.set_weights(EV.Triple_init.actions_weights)
+    NN_Termination.set_weights(EV.Triple_init.termination_weights)
         
     for n in range(1):
         print('iter', n, '/', EV.N)
@@ -903,9 +911,13 @@ def OptimizeRegularizer2Batch(epochs, TrainingSetTermination, NN_termination, ga
     return loss    
 
 def BaumWelchRegularizer2(EV, eta):
-    NN_Options = EV.Triple_init.NN_options
-    NN_Actions = EV.Triple_init.NN_actions
-    NN_Termination = EV.Triple_init.NN_termination
+    NN_Options = NN_options(EV.option_space, EV.size_input)
+    NN_Actions = NN_actions(EV.action_space, EV.size_input)
+    NN_Termination = NN_termination(EV.termination_space, EV.size_input)
+    
+    NN_Options.set_weights(EV.Triple_init.options_weights)
+    NN_Actions.set_weights(EV.Triple_init.actions_weights)
+    NN_Termination.set_weights(EV.Triple_init.termination_weights)
         
     T = EV.TrainingSet.shape[0]
     TrainingSet_Termination = TrainingSetTermination(EV.TrainingSet, EV.option_space, EV.size_input)
@@ -963,32 +975,36 @@ def BaumWelchRegularizer2(EV, eta):
         
     return NN_Termination, NN_Actions, NN_Options
 
-def EvaluationBW(map, stateSpace, P, traj, control, ntraj, action_space, option_space, termination_space, 
-                                                           N, zeta, mu, lambdas, eta, Triple_weights_init):
+def EvaluationBW(traj, control, ntraj, EV, lambdas, eta):
     averageBW = np.empty((0))
     success_percentageBW = np.empty((0))
-    list_triple_weights = []
+    average_expert = np.empty((0))
 
     for i in range(len(ntraj)):
-        labels, TrainingSet = bc.ProcessData(traj[0:ntraj[i]][:],control[0:ntraj[i]][:],stateSpace)
-        NN_Termination, NN_Actions, NN_Options = BaumWelch(labels, TrainingSet, 
-                                                           action_space, option_space, termination_space, 
-                                                           N, zeta, mu, lambdas, eta, Triple_weights_init)
-        list_triple_weights.append(Triple(NN_Options, NN_Actions, NN_Termination))
+        labels, TrainingSet = bc.ProcessData(traj[0:ntraj[i]][:],control[0:ntraj[i]][:],EV.env.stateSpace)
+        EV.TrainingSet = TrainingSet
+        EV.labels = labels
+        NN_Termination, NN_Actions, NN_Options = BaumWelch(EV, lambdas, eta)
         Trajs=100
-        base=ss.BaseStateIndex(stateSpace,map)
-        TERMINAL_STATE_INDEX = ss.TerminalStateIndex(stateSpace,map)
+        base=ss.BaseStateIndex(EV.env.stateSpace,EV.env.map)
+        TERMINAL_STATE_INDEX = ss.TerminalStateIndex(EV.env.stateSpace,EV.env.map)
         [trajBW, controlBW, OptionBW, 
-         TerminationBW, flagBW]=sim.HierarchicalStochasticSampleTrajMDP(P, stateSpace, NN_Options, NN_Actions, NN_Termination, 
-                                                                        mu, 1000, Trajs, base, TERMINAL_STATE_INDEX, 
-                                                                        zeta, option_space)
+         TerminationBW, flagBW]=sim.HierarchicalStochasticSampleTrajMDP(EV.env.P, EV.env.stateSpace, NN_Options, NN_Actions, NN_Termination, 
+                                                                        EV.mu, EV.max_epoch, Trajs, base, TERMINAL_STATE_INDEX, 
+                                                                        EV.zeta, EV.option_space)
         length_trajBW = np.empty((0))
         for j in range(len(trajBW)):
             length_trajBW = np.append(length_trajBW, len(trajBW[j][:]))
         averageBW = np.append(averageBW,np.divide(np.sum(length_trajBW),len(length_trajBW)))
         success_percentageBW = np.append(success_percentageBW,np.divide(np.sum(flagBW),len(length_trajBW)))
+        
+        length_traj = np.empty((0))
+        for k in range(ntraj[i]):
+            length_traj = np.append(length_traj, len(traj[k][:]))
+
+        average_expert = np.append(average_expert, np.divide(np.sum(length_traj),len(length_traj)))
       
-    return averageBW, success_percentageBW, list_triple_weights
+    return averageBW, success_percentageBW, average_expert
     
 class Triple:
     def __init__(self, NN_options, NN_actions, NN_termination):

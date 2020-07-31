@@ -49,7 +49,8 @@ import concurrent.futures
 - Train the Triple of NNs using Baum-Welch with failure algorithm
 - Save Trained model
 - Load Model
-- Evaluate Performance
+- Evaluate Performance 
+- Evaluate Performance given different trajectories for the training
 
 ## main
 

@@ -320,7 +320,7 @@ def VideoSimulation(map,stateSpace,u,states,name_video):
             txt = u'\u2190'
         elif u[s] == ss.HOVER:
             txt = u'\u2715'
-        im = plt.text(stateSpace[states[s],1]+0.3, stateSpace[states[s],0]+0.5,txt)
+        im = plt.text(stateSpace[states[s],1]+0.3, stateSpace[states[s],0]+0.1, txt, fontsize=25)
         ims.append([im])
         
     ani = animation.ArtistAnimation(fig, ims, interval=1200, blit=True,
@@ -417,7 +417,7 @@ def HILVideoSimulation(map,stateSpace,u,states,o,name_video):
             c = 'm'
         elif o[s]==2:
             c = 'y'         
-        im = plt.text(stateSpace[states[s],1]+0.3, stateSpace[states[s],0]+0.5,txt,backgroundcolor=c)
+        im = plt.text(stateSpace[states[s],1]+0.3, stateSpace[states[s],0]+0.1, txt, fontsize=20, backgroundcolor=c)
         ims.append([im])
         
     ani = animation.ArtistAnimation(fig, ims, interval=1200, blit=True,

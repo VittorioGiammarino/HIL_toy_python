@@ -34,7 +34,7 @@ G = dp.ComputeStageCosts(stateSpace,map)
 env.PlotOptimalSolution(map,stateSpace,u_opt_ind_vi, 'Figures/FiguresExpert/Expert_pickup.eps', 'Figures/FiguresExpert/Expert_dropoff.eps')
 
 # %% Generate Expert's trajectories
-T=10
+T=150
 base=ss.BaseStateIndex(stateSpace,map)
 [traj,control,flag]=sim.SampleTrajMDP(P, u_opt_ind_vi, 1000, T, base, TERMINAL_STATE_INDEX)
 labels, TrainingSet = bc.ProcessData(traj,control,stateSpace)
@@ -52,7 +52,7 @@ NN_options = hil.NN_options(option_space, size_input)
 NN_actions = hil.NN_actions(action_space, size_input)
 NN_termination = hil.NN_termination(termination_space, size_input)
 
-N=10 #Iterations
+N=5 #Iterations
 zeta = 0.1 #Failure factor
 mu = np.ones(option_space)*np.divide(1,option_space) #initial option probability distribution
 
@@ -199,8 +199,25 @@ best = np.argmin(length_trajHIL)
 # %% Video of Best Simulation
 env.HILVideoSimulation(map,stateSpace,controlHIL[best][:],trajHIL[best][:],OptionsHIL[0][:],"Videos/VideosHIL/sim_HIL.mp4")
 
+# %% Evaluation on multiple trajs
+ntraj = [2, 5, 10, 20, 50, 100]
+averageBW, success_percentageBW, average_expert = hil.EvaluationBW(traj, control, ntraj, ED, lambdas, eta)
 
-    
+plt.figure()
+plt.subplot(211)
+plt.plot(ntraj, averageBW,'go--', label = 'HIL')
+plt.plot(ntraj, average_expert,'b', label = 'Expert')
+plt.ylabel('Average steps to goal')
+plt.subplot(212)
+plt.plot(ntraj, success_percentageBW,'go--', label = 'HIL')
+plt.plot(ntraj, np.ones((len(ntraj))),'b', label='Expert')
+plt.xlabel('Number of Trajectories')
+plt.ylabel('Percentage of success')
+plt.legend(loc='lower right')
+plt.savefig('Figures/FiguresHIL/evaluationHIL_multipleTrajs.eps', format='eps')
+plt.show()
+
+
     
 
 
